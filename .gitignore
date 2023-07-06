@@ -23,3 +23,4 @@ scribble_label
 wsl_train_MumfordShah_Loss.py
 wsl_train_PLCV2.py
 *.gitignore
+!method.png
