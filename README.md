@@ -1,5 +1,5 @@
-# PHTrans: Parallelly Aggregating Global and Local Representations for Medical Image Segmentation
-This repository is the official PyTorch code for the paper [PHTrans: Parallelly Aggregating Global and Local Representations for Medical Image Segmentation](https://link.springer.com/chapter/10.1007/978-3-031-16443-9_23).
+# DIAS: A Comprehensive Benchmark for DSA-sequence Intracranial Artery Segmentation
+This repository is the official PyTorch code for the paper [DIAS: A Comprehensive Benchmark for DSA-sequence Intracranial Artery Segmentation](https://arxiv.org/pdf/2306.12153.pdf).
 <!-- This repository is the official PyTorch code for the paper '[PHTrans: Parallelly Aggregating Global and Local Representations for Medical Image Segmentation](https://arxiv.org/abs/2203.04568)' (Wentao Liu, Tong Tian, Weijin Xu, Huihua Yang, and Xipeng Pan) -->
 
 <div align="center">
