@@ -1,0 +1,25 @@
+wandb
+*egg-info
+.vscode
+*__pycache__*
+save*
+wrapper
+*png
+*jpg
+*PNG
+*results
+*pdf
+
+*DA_test
+*other_dataset_test
+CVSS_process.py
+# weak_supervised_segmentation
+*minimum_intensity_projection.py
+phtrans.py
+swin_3D.py
+cldice.py
+draw_chart.py
+scribble_label
+
+wsl_train_MumfordShah_Loss.py
+wsl_train_PLCV2.py
