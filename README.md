@@ -3,7 +3,7 @@ This repository is the official PyTorch code for the paper [DIAS: A Comprehensiv
 <!-- This repository is the official PyTorch code for the paper '[PHTrans: Parallelly Aggregating Global and Local Representations for Medical Image Segmentation](https://arxiv.org/abs/2203.04568)' (Wentao Liu, Tong Tian, Weijin Xu, Huihua Yang, and Xipeng Pan) -->
 
 <div align="center">
-  <img src="PHTrans/PHTrans.png" width="70%">
+  <img src="doc/method.png" width="95%">
 </div>
 
 ## News
