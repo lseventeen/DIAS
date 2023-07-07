@@ -6,5 +6,5 @@ This repository is the official PyTorch code for the paper [DIAS: A Comprehensiv
   <img src="doc/method.png" width="95%">
 </div>
 
-## News
+## To be continued
 
