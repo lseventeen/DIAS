@@ -9,7 +9,7 @@ _C.BASE = ['']
 _C.DIS = False
 _C.WORLD_SIZE = 1
 _C.SEED = 1234
-_C.AMP = False
+_C.AMP = True
 _C.EXPERIMENT_ID = ""
 _C.SAVE_DIR = "save_pth"
 _C.MODEL_PATH = ""
@@ -22,15 +22,15 @@ _C.WANDB.MODE = "offline"
 # Data settings
 # -----------------------------------------------------------------------------
 _C.DATASET = CN()
-_C.DATASET.TRAIN_IMAGE_PATH = "/home/lwt/data/CVSS/training/images"
-_C.DATASET.TRAIN_LABEL_PATH = "/home/lwt/data/CVSS/training/labels"
-_C.DATASET.VAL_IMAGE_PATH = "/home/lwt/data/CVSS/validation/images"
-_C.DATASET.VAL_LABEL_PATH = "/home/lwt/data/CVSS/validation/labels"
-_C.DATASET.TEST_IMAGE_PATH = "/home/lwt/data/CVSS/test/images"
-_C.DATASET.TEST_LABEL_PATH = "/home/lwt/data/CVSS/test/labels"
+_C.DATASET.TRAIN_IMAGE_PATH = "/ai/data/data/vessel/DIAS/DSA/data/training/images"
+_C.DATASET.TRAIN_LABEL_PATH = "/ai/data/data/vessel/DIAS/DSA/data/training/labels"
+_C.DATASET.VAL_IMAGE_PATH = "/ai/data/data/vessel/DIAS/DSA/data/validation/images"
+_C.DATASET.VAL_LABEL_PATH = "/ai/data/data/vessel/DIAS/DSA/data/validation/labels"
+_C.DATASET.TEST_IMAGE_PATH = "/ai/data/data/vessel/DIAS/DSA/data/test/images"
+_C.DATASET.TEST_LABEL_PATH = "/ai/data/data/vessel/DIAS/DSA/data/test/labels"
 _C.DATASET.STRIDE = 32
 _C.DATASET.PATCH_SIZE = (64, 64)
-_C.DATASET.NUM_EACH_EPOCH = 40000
+_C.DATASET.NUM_EACH_EPOCH = 20000
 _C.DATASET.WITH_VAL = True
 
 _C.DATALOADER = CN()

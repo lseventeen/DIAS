@@ -12,11 +12,12 @@ gl_epoch = 0
 
 
 class Trainer:
-    def __init__(self, config, train_loader, val_loader, model, loss, optimizer, lr_scheduler, tag):
+    def __init__(self, config, train_loader, val_loader, model,is_2d, loss, optimizer, lr_scheduler, tag):
         self.config = config
         self.scaler = torch.cuda.amp.GradScaler(enabled=True)
         self.loss = loss
         self.model = model
+        self.is_2d = is_2d
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.optimizer = optimizer
@@ -90,6 +91,8 @@ class Trainer:
             self.data_time.update(time.time() - tic)
             img = to_cuda(img)
             gt = to_cuda(gt)
+            if not self.is_2d:
+                img = img.unsqueeze(1)
             self.optimizer.zero_grad()
             with torch.cuda.amp.autocast(enabled=self.config.AMP):
                 pre = self.model(img)
@@ -133,6 +136,8 @@ class Trainer:
             for idx, (img, gt) in enumerate(tbar):
                 img = to_cuda(img)
                 gt = to_cuda(gt)
+                if not self.is_2d:
+                    img = img.unsqueeze(1)
                 with torch.cuda.amp.autocast(enabled=self.config.AMP):
 
                     predict = self.model(img)

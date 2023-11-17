@@ -10,12 +10,13 @@ from batchgenerators.utilities.file_and_folder_operations import *
 
 
 class Inference(Trainer):
-    def __init__(self,config, test_loader, model, save_dir):
+    def __init__(self,config, test_loader,is_2d, model, save_dir):
         # super(Trainer, self).__init__()
         self.config = config
         self.test_loader = test_loader
         self.model = model
         self.save_path = save_dir
+        self.is_2d = is_2d
         self.patch_size = config.DATASET.PATCH_SIZE
         self.stride = config.DATASET.STRIDE
         dir_exists(self.save_path)
@@ -31,6 +32,8 @@ class Inference(Trainer):
             
             for i, img in enumerate(tbar):
                 img = to_cuda(img)
+                if not self.is_2d:
+                    img = img.unsqueeze(1)
                 with torch.cuda.amp.autocast(enabled=self.config.AMP):
                     pre = self.model(img)
                 pre = torch.softmax(pre, dim=1)[:,1,:,:]

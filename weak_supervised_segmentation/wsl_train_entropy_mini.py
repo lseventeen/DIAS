@@ -1,4 +1,9 @@
+import sys
 import os
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(parent_dir)
 import time
 import math
 import torch
@@ -12,7 +17,7 @@ import argparse
 from loguru import logger
 from data import build_train_loader
 from utils.helpers import seed_torch
-from losses import *
+from losses.losses import *
 from datetime import datetime
 import wandb
 from configs.config import get_config
@@ -28,11 +33,12 @@ import torch.distributed as dist
 
 
 class Trainer:
-    def __init__(self, config, train_loader, val_loader, model, optimizer, lr_scheduler):
+    def __init__(self, config, train_loader, val_loader, is_2d, model, optimizer, lr_scheduler):
         self.config = config
 
         self.scaler = torch.cuda.amp.GradScaler(enabled=True)
         self.model = model
+        self.is_2d = is_2d
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.optimizer = optimizer
@@ -101,6 +107,8 @@ class Trainer:
 
         for idx, (img, gt) in enumerate(tbar):
             self.data_time.update(time.time() - tic)
+            if not self.is_2d:
+                img1 = img1.unsqueeze(1)
             img = to_cuda(img)
             gt = to_cuda(gt)
             self.optimizer.zero_grad()
@@ -148,6 +156,8 @@ class Trainer:
             for idx, (img, gt) in enumerate(tbar):
                 img = to_cuda(img)
                 gt = to_cuda(gt)
+                if not self.is_2d:
+                    img = img.unsqueeze(1)
 
                 with torch.cuda.amp.autocast(enabled=self.config.AMP):
 
@@ -288,7 +298,7 @@ def main_worker(local_rank, config):
     cudnn.benchmark = True
 
     train_loader, val_loader = build_train_loader(config)
-    model = build_model(config)
+    model,is_2d = build_model(config)
     # model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model).cuda()
     if config.DIS:
         model = torch.nn.parallel.DistributedDataParallel(
@@ -300,7 +310,9 @@ def main_worker(local_rank, config):
     trainer = Trainer(config=config,
                       train_loader=train_loader,
                       val_loader=val_loader,
+                      
                       model=model.cuda(),
+                      is_2d=is_2d,
                       optimizer=optimizer,
                       lr_scheduler=lr_scheduler)
     trainer.train()

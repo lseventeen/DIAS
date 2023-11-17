@@ -2,13 +2,13 @@ import numpy as np
 from batchgenerators.utilities.file_and_folder_operations import *
 import torch
 from torch.utils.data import Dataset
-from data.data_augmentation import Compose, ToTensor, CropToFixed, HorizontalFlip, VerticalFlip, RandomRotate90, GaussianBlur3D, RandomContrast, AdditiveGaussianNoise
+from utils.data_augmentation import Compose, ToTensor, CropToFixed, HorizontalFlip, VerticalFlip, RandomRotate90, GaussianBlur3D, RandomContrast, AdditiveGaussianNoise
 import cv2
 import torch.nn.functional as F
 from skimage.transform import resize
 
 
-class train_dataset(Dataset):
+class Train_dataset(Dataset):
     def __init__(self, config, images_path, labels_path):
         self.images_path = images_path
         self.labels_path = labels_path
@@ -75,7 +75,7 @@ class train_dataset(Dataset):
         # return len(self.images)
 
 
-class CVSS_PLC_train_dataset(Dataset):
+class PLC_Train_dataset(Dataset):
     def __init__(self, config, images_path, labels_path):
         self.images_path = images_path
         self.labels_path = labels_path
@@ -107,7 +107,7 @@ class CVSS_PLC_train_dataset(Dataset):
             GaussianBlur3D(execution_probability=0.5),
             AdditiveGaussianNoise(np.random.RandomState(
                 seed), scale=(0., 0.1), execution_probability=0.1),
-            # ToTensor(False)
+            ToTensor(False)
         ])
 
     def read_image(self, images_path, label_path):
@@ -140,14 +140,18 @@ class CVSS_PLC_train_dataset(Dataset):
 
         img = self.seq_DA(img)
         gt = self.gt_DA(gt)
-        return ToTensor(False)(img), ToTensor(False)(img), gt.long()
+        # img = self.separate_DA(img)
+        img1 = self.separate_DA(img)
+        img2 = self.separate_DA(img)
+        
+        return img1, img2, gt.long()
 
     def __len__(self):
         return self.num_each_epoch
         # return len(self.images)
 
 
-class CVSS_test_dataset(Dataset):
+class Test_dataset(Dataset):
     def __init__(self, config, images_path, labels_path):
         self.images_path = images_path
         self.labels_path = labels_path

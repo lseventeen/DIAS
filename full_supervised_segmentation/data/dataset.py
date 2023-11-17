@@ -1,20 +1,21 @@
+import sys
+import os
 import numpy as np
 from batchgenerators.utilities.file_and_folder_operations import *
 import torch
 from torch.utils.data import Dataset
-from data.data_augmentation import Compose, ToTensor, CropToFixed, HorizontalFlip, VerticalFlip, RandomRotate90
+from utils.data_augmentation import Compose, ToTensor, CropToFixed, HorizontalFlip, VerticalFlip, RandomRotate90
 import cv2
 import torch.nn.functional as F
 
 
-class train_dataset(Dataset):
+class Train_dataset(Dataset):
     def __init__(self, config, images_path, labels_path):
         self.images_path = images_path
         self.labels_path = labels_path
         self.size = config.DATASET.PATCH_SIZE
         self.num_each_epoch = config.DATASET.NUM_EACH_EPOCH
-        self.images, self.gts = self.read_image(
-            self.images_path, self.labels_path)
+        self.image_list = os.listdir(self.images_path)
 
         seed = np.random.randint(123)
 
@@ -34,34 +35,14 @@ class train_dataset(Dataset):
             ToTensor(False)
         ])
 
-    def read_image(self, images_path, label_path):
-        label_files = list(sorted(os.listdir(label_path)))
-        images = []
-        gts = []
-        for i in range(len(label_files)):
-            image_each_slice = []
-            for j in range(8):
-                img = cv2.imread(os.path.join(
-                    images_path, f"image_s{i}_i{j}.png"), 0)
-                image_each_slice.append(img)
-            seq = np.array(image_each_slice)
-            mn = seq.mean()
-            std = seq.std()
-            seq = (seq - mn) / (std + 1e-8)
-            images.append(seq)
-
-            gt = cv2.imread(os.path.join(
-                label_path, f"label_s{i}.png"), 0)
-            gt = np.array(gt/255)[np.newaxis]
-            gts.append(gt)
-
-        return images, gts
-
     def __getitem__(self, idx):
-        id = np.random.randint(len(self.images))
-        img = self.images[id]
-        gt = self.gts[id]
-
+        id = np.random.randint(len(self.image_list))
+        img_id = self.image_list[id]
+        img =  np.load(os.path.join(self.images_path,img_id))
+        gt = cv2.imread(os.path.join(
+                self.labels_path, f"label_s{img_id.split('.')[0]}.png"), 0)
+        gt = np.array(gt/255)[np.newaxis]
+        # gt = np.load(os.path.join(self.labels_path,img_id))[np.newaxis]
         img = self.seq_DA(img)
         gt = self.gt_DA(gt)
         return img, gt.long()
@@ -70,7 +51,7 @@ class train_dataset(Dataset):
         return self.num_each_epoch
 
 
-class test_dataset(train_dataset):
+class Test_dataset(Train_dataset):
     def __init__(self, config, images_path, labels_path):
         self.images_path = images_path
         self.labels_path = labels_path
@@ -82,7 +63,23 @@ class test_dataset(train_dataset):
             self.img_list, self.patch_size, self.stride)
         self.gt_patch = self.get_patch(
             self.gt_list, self.patch_size, self.stride)
+    def read_image(self, images_path, label_path):
+        label_files = list(sorted(os.listdir(label_path)))
+        images = []
+        gts = []
+        for i in range(len(label_files)):
+            
+            image = np.load(os.path.join(images_path,f"{i}.npy"))
+            images.append(image)
+            
+  
+            gt = cv2.imread(os.path.join(
+                self.labels_path, f"label_s{i}.png"), 0)
+            gt = np.array(gt/255)[np.newaxis]
+            # gt = np.load(os.path.join(self.labels_path,f"{i}.npy"))[np.newaxis]
+            gts.append(gt)
 
+        return images, gts
     def get_patch(self, image_list, patch_size, stride):
         patch_list = []
         _, h, w = image_list[0].shape

@@ -9,34 +9,34 @@ class conv(nn.Module):
         self.in_c = in_c
         self.out_c = out_c
         self.conv = nn.Sequential(
-            nn.Conv3d(out_c, out_c, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm3d(out_c),
-            nn.Dropout3d(dp),
+            nn.Conv2d(out_c, out_c, kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(out_c),
+            nn.Dropout2d(dp),
             nn.LeakyReLU(0.1, inplace=True),
-            nn.Conv3d(out_c, out_c, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm3d(out_c),
-            nn.Dropout3d(dp),
+            nn.Conv2d(out_c, out_c, kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(out_c),
+            nn.Dropout2d(dp),
             nn.LeakyReLU(0.1, inplace=True))
-        self.relu = nn.LeakyReLU(0.1, inplace=True)
+        # self.relu = nn.LeakyReLU(0.1, inplace=True)
 
     def forward(self, x):
-        res = x
+        # res = x
         x = self.conv(x)
-        out = x + res
-        out = self.relu(out)
-        return out
+        # out = x + res
+        # out = self.relu(out)
+        return x
 
 
 class feature_fuse(nn.Module):
     def __init__(self, in_c, out_c):
         super(feature_fuse, self).__init__()
-        self.conv11 = nn.Conv3d(
+        self.conv11 = nn.Conv2d(
             in_c, out_c, kernel_size=1, padding=0, bias=False)
-        self.conv33 = nn.Conv3d(
+        self.conv33 = nn.Conv2d(
             in_c, out_c, kernel_size=3, padding=1, bias=False)
-        self.conv33_di = nn.Conv3d(
+        self.conv33_di = nn.Conv2d(
             in_c, out_c, kernel_size=3, padding=2, bias=False, dilation=2)
-        self.norm = nn.BatchNorm3d(out_c)
+        self.norm = nn.BatchNorm2d(out_c)
 
     def forward(self, x):
         x1 = self.conv11(x)
@@ -47,12 +47,12 @@ class feature_fuse(nn.Module):
 
 
 class up(nn.Module):
-    def __init__(self, in_c, out_c, stride=[1, 2, 2]):
+    def __init__(self, in_c, out_c, dp=0):
         super(up, self).__init__()
         self.up = nn.Sequential(
-            nn.ConvTranspose3d(in_c, out_c, kernel_size=stride,
-                               padding=0, stride=stride, bias=False),
-            nn.BatchNorm3d(out_c),
+            nn.ConvTranspose2d(in_c, out_c, kernel_size=2,
+                               padding=0, stride=2, bias=False),
+            nn.BatchNorm2d(out_c),
             nn.LeakyReLU(0.1, inplace=False))
 
     def forward(self, x):
@@ -61,12 +61,12 @@ class up(nn.Module):
 
 
 class down(nn.Module):
-    def __init__(self, in_c, out_c, stride=[1, 2, 2]):
+    def __init__(self, in_c, out_c, dp=0):
         super(down, self).__init__()
         self.down = nn.Sequential(
-            nn.Conv3d(in_c, out_c, kernel_size=stride,
-                      padding=0, stride=stride, bias=False),
-            nn.BatchNorm3d(out_c),
+            nn.Conv2d(in_c, out_c, kernel_size=2,
+                      padding=0, stride=2, bias=False),
+            nn.BatchNorm2d(out_c),
             nn.LeakyReLU(0.1, inplace=True))
 
     def forward(self, x):
@@ -110,26 +110,17 @@ class block(nn.Module):
             return x, x_up, x_down
 
 
-class final_conv(nn.Module):
-    def __init__(self, in_c, out_c) -> None:
-        super().__init__()
-        self.conv1 = nn.Conv3d(in_c, 1, kernel_size=1)
-        self.conv2 = nn.Conv2d(8, out_c, kernel_size=1)
+class FR_UNet(nn.Module):
+    def __init__(self, num_classes=3, num_channels=1, feature_scale=2,  dropout=0.1, fuse=True, out_ave=True):
+        super(FR_UNet, self).__init__()
 
-    def forward(self, x):
-        x = self.conv1(x)
-        x = self.conv2(x.squeeze(1))
-        return x
+        self.num_channels = num_channels
 
-
-class FR_UNet_3D(nn.Module):
-    def __init__(self,  num_classes=1, num_channels=1, feature_scale=4,  dropout=0.1, fuse=True, out_ave=True):
-        super(FR_UNet_3D, self).__init__()
         self.out_ave = out_ave
         filters = [64, 128, 256, 512, 1024]
         filters = [int(x / feature_scale) for x in filters]
         self.block1_3 = block(
-            num_channels, filters[0],  dp=dropout, is_up=False, is_down=True, fuse=fuse)
+            self.num_channels, filters[0],  dp=dropout, is_up=False, is_down=True, fuse=fuse)
         self.block1_2 = block(
             filters[0], filters[0],  dp=dropout, is_up=False, is_down=True, fuse=fuse)
         self.block1_1 = block(
@@ -160,16 +151,22 @@ class FR_UNet_3D(nn.Module):
             filters[2]*3, filters[2],  dp=dropout, is_up=True, is_down=False, fuse=fuse)
         self.block40 = block(filters[3], filters[3],
                              dp=dropout, is_up=True, is_down=False, fuse=fuse)
-        self.final1 = final_conv(filters[0], num_classes)
-        self.final2 = final_conv(filters[0], num_classes)
-        self.final3 = final_conv(filters[0], num_classes)
-        self.final4 = final_conv(filters[0], num_classes)
-        self.final5 = final_conv(filters[0], num_classes)
-        self.fuse = nn.Conv3d(
+        self.final1 = nn.Conv2d(
+            filters[0], num_classes, kernel_size=1, padding=0, bias=True)
+        self.final2 = nn.Conv2d(
+            filters[0], num_classes, kernel_size=1, padding=0, bias=True)
+        self.final3 = nn.Conv2d(
+            filters[0], num_classes, kernel_size=1, padding=0, bias=True)
+        self.final4 = nn.Conv2d(
+            filters[0], num_classes, kernel_size=1, padding=0, bias=True)
+        self.final5 = nn.Conv2d(
+            filters[0], num_classes, kernel_size=1, padding=0, bias=True)
+        self.fuse = nn.Conv2d(
             5, num_classes, kernel_size=1, padding=0, bias=True)
         self.apply(InitWeights)
 
     def forward(self, x):
+
         x1_3, x_down1_3 = self.block1_3(x)
         x1_2, x_down1_2 = self.block1_2(x1_3)
         x2_2, x_up2_2, x_down2_2 = self.block2_2(x_down1_3)
@@ -193,5 +190,6 @@ class FR_UNet_3D(nn.Module):
                       self.final3(x11)+self.final4(x12)+self.final5(x13))/5
         else:
             output = self.final5(x13)
+        # output = torch.softmax(output, dim=1)
 
         return output

@@ -6,8 +6,8 @@ from models.utils import InitWeights
 class conv(nn.Module):
     def __init__(self, in_c, out_c, dp=0):
         super(conv, self).__init__()
-        self.in_c = in_c
-        self.out_c = out_c
+        
+        self.conv11 = nn.Conv2d(in_c, out_c, kernel_size=1, stride=1) if in_c != out_c else None
         self.conv = nn.Sequential(
             nn.Conv2d(out_c, out_c, kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(out_c),
@@ -15,16 +15,19 @@ class conv(nn.Module):
             nn.LeakyReLU(0.1, inplace=True),
             nn.Conv2d(out_c, out_c, kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(out_c),
-            nn.Dropout2d(dp),
-            nn.LeakyReLU(0.1, inplace=True))
+            nn.Dropout2d(dp)
+            
+)
         self.relu = nn.LeakyReLU(0.1, inplace=True)
 
     def forward(self, x):
+        if self.conv11 is not None:
+            x = self.conv11(x)
         res = x
         x = self.conv(x)
         out = x + res
         out = self.relu(out)
-        return out
+        return x
 
 
 class feature_fuse(nn.Module):

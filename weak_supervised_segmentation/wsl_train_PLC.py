@@ -1,4 +1,9 @@
+import sys
 import os
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(parent_dir)
 import time
 import math
 import torch
@@ -12,7 +17,7 @@ import argparse
 from loguru import logger
 from data import build_PLC_train_loader
 from utils.helpers import seed_torch
-from losses import *
+from losses.losses import *
 from datetime import datetime
 import wandb
 from configs.config import get_config_PLC
@@ -29,10 +34,11 @@ from torch.nn.modules.loss import CrossEntropyLoss, MSELoss
 
 
 class Trainer:
-    def __init__(self, config, train_loader, val_loader, model1, model2, optimizer1, optimizer2, lr_scheduler1, lr_scheduler2):
+    def __init__(self, config, train_loader, val_loader, is_2d, model1, model2, optimizer1, optimizer2, lr_scheduler1, lr_scheduler2):
         self.config = config
 
         self.scaler = torch.cuda.amp.GradScaler(enabled=True)
+        self.is_2d = is_2d
         self.model1 = model1
         self.model2 = model2
         self.train_loader = train_loader
@@ -113,6 +119,9 @@ class Trainer:
             self.data_time.update(time.time() - tic)
             img1 = to_cuda(img1)
             img2 = to_cuda(img2)
+            if not self.is_2d:
+                img1 = img1.unsqueeze(1)
+                img2 = img2.unsqueeze(1)
             gt = to_cuda(gt.squeeze(1))
             self.optimizer1.zero_grad()
             self.optimizer2.zero_grad()
@@ -141,6 +150,7 @@ class Trainer:
                 loss = pce_loss1+pce_loss2+self.pseudo_weight * \
                     (ce_loss1+ce_loss2)+self.consistency_weight * \
                     (self.consistency_loss)
+                # loss = pce_loss1+pce_loss2
 
             if self.config.AMP:
                 self.scaler.scale(loss).backward()
@@ -185,6 +195,8 @@ class Trainer:
         with torch.no_grad():
             for idx, (img, gt) in enumerate(tbar):
                 img = to_cuda(img)
+                if not self.is_2d:
+                    img = img.unsqueeze(1)
                 gt = to_cuda(gt.squeeze(1))
 
                 with torch.cuda.amp.autocast(enabled=self.config.AMP):
@@ -278,7 +290,7 @@ class Trainer:
 
 
 def parse_option():
-    parser = argparse.ArgumentParser("CVSS_training")
+    parser = argparse.ArgumentParser("DIAS_training")
     parser.add_argument('--cfg', type=str, metavar="FILE",
                         help='path to config file')
     parser.add_argument(
@@ -297,9 +309,9 @@ def parse_option():
                         required=False, action="store_true")
     parser.add_argument('-ws', '--world_size', type=int,
                         help="process number for DDP")
-    parser.add_argument('-plw', '--pseudo_loss_weight', type=float, default=0.2,
+    parser.add_argument('-plw', '--pseudo_loss_weight', type=float, default=1,
                         help="process number for DDP")
-    parser.add_argument('-clw', '--consistency_loss_weight', type=float, default=0.2,
+    parser.add_argument('-clw', '--consistency_loss_weight', type=float, default=0.5,
                         help="process number for DDP")
 
     args = parser.parse_args()
@@ -334,8 +346,8 @@ def main_worker(local_rank, config):
     cudnn.benchmark = True
 
     train_loader, val_loader = build_PLC_train_loader(config)
-    model1 = build_model(config)
-    model2 = build_model(config)
+    model1,is_2d = build_model(config)
+    model2,_ = build_model(config)
     # model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model).cuda()
     if config.DIS:
         model = torch.nn.parallel.DistributedDataParallel(
@@ -350,6 +362,7 @@ def main_worker(local_rank, config):
     trainer = Trainer(config=config,
                       train_loader=train_loader,
                       val_loader=val_loader,
+                      is_2d = is_2d,
                       model1=model1.cuda(),
                       model2=model2.cuda(),
                       optimizer1=optimizer1,

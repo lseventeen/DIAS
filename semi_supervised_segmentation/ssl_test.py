@@ -3,7 +3,7 @@ from loguru import logger
 from data import build_test_loader
 from tester import Tester
 from utils.helpers import load_checkpoint
-from losses import *
+from losses.losses import *
 from configs.config import get_val_config
 from models import build_model
 import numpy as np
@@ -29,14 +29,14 @@ def parse_option():
 
 def main(config):
     save_dir = config.MODEL_PATH.split(
-        '/')[-3]+"/"+config.MODEL_PATH.split('/')[-2]
+        '/')[-2]+"/"+config.MODEL_PATH.split('/')[-1]
     np.set_printoptions(formatter={'float': '{: 0.4f}'.format}, suppress=True)
     test_loader = build_test_loader(config)
 
-    model_checkpoint = load_checkpoint(config.MODEL_PATH, False)
+    model_checkpoint = load_checkpoint(config.MODEL_PATH,False)
     config_chk = model_checkpoint["config"]
     model_name = config_chk.MODEL.TYPE
-    model = build_model(config_chk)
+    model, is_2d = build_model(config_chk)
     model.load_state_dict({k.replace('module.', ''): v for k,
                           v in model_checkpoint['state_dict'].items()})
     logger.info(f'\n{model}\n')
@@ -44,6 +44,7 @@ def main(config):
                     test_loader=test_loader,
                     model=model.eval().cuda(),
                     save_dir=save_dir,
+                    is_2d=is_2d,
                     model_name=model_name)
     tester.test()
 

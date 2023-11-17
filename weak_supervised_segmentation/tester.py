@@ -12,10 +12,11 @@ from batchgenerators.utilities.file_and_folder_operations import *
 import pandas as pd
 
 class Tester(Trainer):
-    def __init__(self,config, test_loader, model, save_dir, model_name):
+    def __init__(self,config, test_loader, model,is_2d, save_dir, model_name):
         self.config = config
         self.test_loader = test_loader
         self.model = model
+        self.is_2d = is_2d
         self.model_name = model_name
         self.save_path = "save_results/" + save_dir
         self.labels_path = config.DATASET.TEST_LABEL_PATH
@@ -38,6 +39,8 @@ class Tester(Trainer):
             for i, (img, _) in enumerate(tbar):
                 self.data_time.update(time.time() - tic)
                 img = to_cuda(img)
+                if not self.is_2d:
+                    img = img.unsqueeze(1)
                 with torch.cuda.amp.autocast(enabled=self.config.AMP):
                     pre = self.model(img)
             

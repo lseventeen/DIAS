@@ -15,7 +15,7 @@ _C.SAVE_DIR = "save_pth"
 _C.MODEL_PATH = ""
 
 _C.WANDB = CN()
-_C.WANDB.PROJECT = "CVSS_WSL"
+_C.WANDB.PROJECT = "DIAS_WSL"
 _C.WANDB.TAG = ""
 _C.WANDB.MODE = "offline"
 _C.SCRIBBLE_TYPE = "scribble"
@@ -23,18 +23,18 @@ _C.SCRIBBLE_TYPE = "scribble"
 # Data settings
 # -----------------------------------------------------------------------------
 _C.DATASET = CN()
-_C.DATASET.TRAIN_IMAGE_PATH = "/home/lwt/Lsata4t/data/CVSS/training/images"
+_C.DATASET.TRAIN_IMAGE_PATH = "/ai/data/data/vessel/DIAS/training/images"
 # _C.DATASET.SCRIBBLE_LABEL_PATH = "/home/lwt/data/CVSS/training/scribble_type/scribble"
-_C.DATASET.MANUAL_LABEL_PATH = "/home/lwt/Lsata4t/data/CVSS/training/label_wlmV3"
+_C.DATASET.MANUAL_LABEL_PATH = "/ai/data/data/vessel/DIAS/training/wsl/label_wlmV3"
 # _C.DATASET.CENTERLINE_LABEL_PATH = "/home/lwt/data/CVSS/training/scribble_type/centerline"
 # _C.DATASET.CENTERLINE_LABEL_PATH = "/home/lwt/data/CVSS/training/centerline"
-_C.DATASET.SCRIBBLE_LABEL_PATH = "/home/lwt/Lsata4t/data/CVSS/training/label_luo"
+_C.DATASET.SCRIBBLE_LABEL_PATH = "/ai/data/data/vessel/DIAS/training/wsl/label_luo"
 # _C.DATASET.CENTERLINE_LABEL_PATH = "/home/lwt/data/CVSS/training/scribble_type/scrawl_labels"
 
-_C.DATASET.VAL_IMAGE_PATH = "/home/lwt/Lsata4t/data/CVSS/validation/images"
-_C.DATASET.VAL_LABEL_PATH = "/home/lwt/Lsata4t/data/CVSS/validation/labels"
-_C.DATASET.TEST_IMAGE_PATH = "/home/lwt/Lsata4t/data/CVSS/test/images"
-_C.DATASET.TEST_LABEL_PATH = "/home/lwt/Lsata4t/data/CVSS/test/labels"
+_C.DATASET.VAL_IMAGE_PATH = "/ai/data/data/vessel/DIAS/validation/images"
+_C.DATASET.VAL_LABEL_PATH = "/ai/data/data/vessel/DIAS/validation/labels"
+_C.DATASET.TEST_IMAGE_PATH = "/ai/data/data/vessel/DIAS/test/images"
+_C.DATASET.TEST_LABEL_PATH = "/ai/data/data/vessel/DIAS/test/labels"
 
 # _C.DATASET.TEST_IMAGE_PATH  = "/home/lwt/Lsata4t/data/CVSS/training/images"
 # _C.DATASET.TEST_LABEL_PATH = "/home/lwt/Lsata4t/data/CVSS/training/labels"
@@ -55,7 +55,7 @@ _C.DATALOADER.NUM_WORKERS = 8
 # Model settings
 # -----------------------------------------------------------------------------
 _C.MODEL = CN()
-_C.MODEL.TYPE = "FR_UNet"
+_C.MODEL.TYPE = "VSS_Net"
 
 _C.TRAIN = CN()
 _C.TRAIN.DO_BACKPROP = False

@@ -1,9 +1,13 @@
+import sys
+import os
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(parent_dir)
 import argparse
 from loguru import logger
 from data import build_test_loader
 from tester import Tester
 from utils.helpers import load_checkpoint
-from semi_supervised_segmentation.losses import *
 from configs.config import get_val_config
 from models import build_model
 import numpy as np

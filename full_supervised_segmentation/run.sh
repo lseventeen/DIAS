@@ -1,0 +1,12 @@
+CUDA_VISIBLE_DEVICES=1 python fsl_train.py -mt Att_UNet --tag NN -wm online 
+CUDA_VISIBLE_DEVICES=1 python fsl_train.py -mt CSNet --tag NN -wm online 
+CUDA_VISIBLE_DEVICES=1 python fsl_train.py -mt UNet_Nested --tag NN -wm online
+CUDA_VISIBLE_DEVICES=1 python fsl_train.py -mt Res_UNet --tag NN -wm online 
+CUDA_VISIBLE_DEVICES=1 python fsl_train.py -mt UNet_3D --tag NN -wm online 
+CUDA_VISIBLE_DEVICES=1 python fsl_train.py -mt FR_UNet_3D --tag NN -wm online 
+CUDA_VISIBLE_DEVICES=1 python fsl_train.py -mt CSNet_3D --tag NN -wm online 
+CUDA_VISIBLE_DEVICES=1 python fsl_train.py -mt Att_UNet_3D --tag NN -wm online 
+CUDA_VISIBLE_DEVICES=1 python fsl_train.py -mt Res_UNet_3D --tag NN -wm online 
+CUDA_VISIBLE_DEVICES=1 python fsl_train.py -mt UNet_Nested_3D --tag NN -wm online 
+CUDA_VISIBLE_DEVICES=1 python fsl_train.py -mt PSC --tag NN -wm online 
+CUDA_VISIBLE_DEVICES=1 python fsl_train.py -mt SVS_Net --tag NN -wm online

@@ -30,6 +30,7 @@ def build_train_single_loader(config):
 def build_train_all_loader(config, pseudo_images_path):
     train_dataset = train_all_dataset(config, images_path=config.DATASET.TRAIN_IMAGE_PATH,
                                       labels_path=config.DATASET.TRAIN_LABEL_PATH,
+                                      num_unlabel_images = config.DATASET.NUM_UNLABEL,
                                       unlabel_images_path=config.DATASET.UNLABEL_IMAGE_PATH,
                                       pseudo_images_path=pseudo_images_path)
     train_sampler = torch.utils.data.distributed.DistributedSampler(

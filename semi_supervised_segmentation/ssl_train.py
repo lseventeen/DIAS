@@ -1,9 +1,16 @@
+import sys
+import os
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(parent_dir)
+
 import argparse
 from loguru import logger
 from data import build_train_single_loader, build_train_all_loader, build_val_loader, build_inference_loader
 from trainer import Trainer
 from utils.helpers import seed_torch
-from losses import DC_and_CE_loss
+from losses.losses import DC_and_CE_loss
 from datetime import datetime
 import wandb
 from configs.config import get_config
@@ -21,7 +28,7 @@ from inference import Inference
 
 
 def parse_option():
-    parser = argparse.ArgumentParser("CVSS_training")
+    parser = argparse.ArgumentParser("DIAS_training")
     parser.add_argument('--cfg', type=str, metavar="FILE",
                         help='path to config file')
     parser.add_argument(
@@ -38,7 +45,9 @@ def parse_option():
     parser.add_argument('-ed', '--enable_distributed', help="training without DDP",
                         required=False, action="store_true")
     parser.add_argument('-nl', '--num_label',
-                        help="number of label data: (1-60)", default=1)
+                        help="number of label data: (1-60)",type=int,  default=1)
+    parser.add_argument('-nu', '--num_unlabel',
+                        help="number of unlabel data: (1-60)", type=int, default=30)
     parser.add_argument('-ws', '--world_size', type=int,
                         help="process number for DDP")
     args = parser.parse_args()
@@ -67,7 +76,7 @@ def main_worker(local_rank, config):
     seed_torch(seed)
     cudnn.benchmark = True
 
-    model = build_model(config)
+    model,is_2d = build_model(config)
     # model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model).cuda()
     if config.DIS:
         model = torch.nn.parallel.DistributedDataParallel(
@@ -91,14 +100,16 @@ def main_worker(local_rank, config):
                       train_loader=train_label_loader,
                       val_loader=val_loader,
                       model=model.cuda(),
+                      is_2d = is_2d,
                       loss=loss,
                       optimizer=optimizer,
                       lr_scheduler=lr_scheduler,
                       tag=tag,
                       )
     checkpoint_dir = trainer.train()
-
+    # checkpoint_dir = "/ai/code/DIAS/semi_supervised_segmentation/save_pth/VSS_Net_1_30_231107_093851/ite_1_teacher"
     for i in range(1, config.ITE+1):
+        # save_dir = "pseudo_label/VSS_Net_1_30_231107_093851/ite_1_teacher"
         save_dir = "pseudo_label" + "/"+config.EXPERIMENT_ID + "/" + tag
         test_loader = build_inference_loader(config)
         model_checkpoint = load_checkpoint(checkpoint_dir, False)
@@ -107,6 +118,7 @@ def main_worker(local_rank, config):
         predict = Inference(config=config,
                             test_loader=test_loader,
                             model=model.eval().cuda(),
+                            is_2d = is_2d,
                             save_dir=save_dir,
                             )
         predict.predict()
@@ -118,6 +130,7 @@ def main_worker(local_rank, config):
                           train_loader=train_label_loader,
                           val_loader=val_loader,
                           model=model.cuda(),
+                          is_2d = is_2d,
                           loss=loss,
                           optimizer=optimizer,
                           lr_scheduler=lr_scheduler,

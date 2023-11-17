@@ -5,31 +5,32 @@ from yacs.config import CfgNode as CN
 _C = CN()
 # Base config files
 _C.BASE = ['']
-_C.ITE = 1
+_C.ITE = 3
 _C.DIS = False
 _C.WORLD_SIZE = 1
 _C.SEED = 1234
-_C.AMP = False
+_C.AMP = True
 _C.EXPERIMENT_ID = ""
 _C.SAVE_DIR = "save_pth"
 _C.MODEL_PATH = ""
 
 _C.WANDB = CN()
-_C.WANDB.PROJECT = "CVSS_SSL"
+_C.WANDB.PROJECT = "DIAS_SSL"
 _C.WANDB.TAG = ""
 _C.WANDB.MODE = "offline"
 # -----------------------------------------------------------------------------
 # Data settings
 # -----------------------------------------------------------------------------
 _C.DATASET = CN()
-_C.DATASET.TRAIN_IMAGE_PATH = "/home/lwt/Lsata4t/data/CVSS/training/images"
-_C.DATASET.TRAIN_LABEL_PATH = "/home/lwt/Lsata4t/data/CVSS/training/labels"
-_C.DATASET.UNLABEL_IMAGE_PATH = "/home/lwt/Lsata4t/data/CVSS/training/unlabel"
-_C.DATASET.VAL_IMAGE_PATH = "/home/lwt/Lsata4t/data/CVSS/validation/images"
-_C.DATASET.VAL_LABEL_PATH = "/home/lwt/Lsata4t/data/CVSS/validation/labels"
-_C.DATASET.TEST_IMAGE_PATH = "/home/lwt/Lsata4t/data/CVSS/test/images"
-_C.DATASET.TEST_LABEL_PATH = "/home/lwt/Lsata4t/data/CVSS/test/labels"
+_C.DATASET.TRAIN_IMAGE_PATH = "/ai/data/data/vessel/DIAS/training/images"
+_C.DATASET.TRAIN_LABEL_PATH = "/ai/data/data/vessel/DIAS/training/labels"
+_C.DATASET.UNLABEL_IMAGE_PATH = "/ai/data/data/vessel/DIAS/training/unlabel"
+_C.DATASET.VAL_IMAGE_PATH = "/ai/data/data/vessel/DIAS/validation/images"
+_C.DATASET.VAL_LABEL_PATH = "/ai/data/data/vessel/DIAS/validation/labels"
+_C.DATASET.TEST_IMAGE_PATH = "/ai/data/data/vessel/DIAS/test/images"
+_C.DATASET.TEST_LABEL_PATH = "/ai/data/data/vessel/DIAS/test/labels"
 _C.DATASET.NUM_LABEL = 1
+_C.DATASET.NUM_UNLABEL = 30
 _C.DATASET.STRIDE = 32
 _C.DATASET.PATCH_SIZE = (64, 64)
 _C.DATASET.NUM_EACH_EPOCH = 40000
@@ -119,6 +120,8 @@ def update_config(config, args):
         config.WORLD_SIZE = args.world_size
     if args.num_label:
         config.DATASET.NUM_LABEL = args.num_label
+    if args.num_unlabel:
+        config.DATASET.NUM_UNLABEL = args.num_unlabel
     if args.enable_distributed:
         config.DIS = True
 

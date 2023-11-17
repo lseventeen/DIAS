@@ -1,8 +1,14 @@
+import sys
+import os
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(parent_dir)
 import argparse
 from loguru import logger
 from data import build_test_loader
 from utils.helpers import load_checkpoint
-from losses import *
+from losses.losses import *
 from configs.config import get_val_config
 from models import build_model
 import numpy as np
@@ -21,9 +27,10 @@ import pandas as pd
 
 
 class Tester(Trainer):
-    def __init__(self, config, test_loader, model1, model2, save_dir, model_name):
+    def __init__(self, config, test_loader, model1, model2,is_2d, save_dir, model_name):
         self.config = config
         self.test_loader = test_loader
+        self.is_2d = is_2d
         self.model1 = model1
         self.model2 = model2
         self.model_name = model_name
@@ -38,8 +45,10 @@ class Tester(Trainer):
     def test(self):
         self.model1.eval()
         self.model2.eval()
+        
         self._reset_metrics()
         gts = self.get_labels()
+        
         tbar = tqdm(self.test_loader, ncols=150)
         tic = time.time()
         pres = []
@@ -48,6 +57,9 @@ class Tester(Trainer):
             for i, (img, _) in enumerate(tbar):
                 self.data_time.update(time.time() - tic)
                 img = to_cuda(img)
+                if not self.is_2d:
+                    img = img.unsqueeze(1)
+                   
                 with torch.cuda.amp.autocast(enabled=self.config.AMP):
                     pre1 = self.model1(img)
                     pre2 = self.model2(img)
@@ -58,7 +70,7 @@ class Tester(Trainer):
                 pre2 = torch.softmax(pre2[:, :self.config.DATASET.NUM_CLASSES], dim=1)[
                     :, 1, :, :]
                 pre = (pre1+pre2)/2
-                # pre = pre2
+                # pre = pre1
                 pres.extend(pre)
                 tbar.set_description(
                     'TEST ({}) |  |B {:.2f} D {:.2f} |'.format(i, self.batch_time.average, self.data_time.average))
@@ -140,8 +152,8 @@ def main(config):
     model_checkpoint = load_checkpoint(config.MODEL_PATH, False)
     config_chk = model_checkpoint["config"]
     model_name = config_chk.MODEL.TYPE
-    model1 = build_model(config_chk)
-    model2 = build_model(config_chk)
+    model1,is_2d = build_model(config_chk)
+    model2,_ = build_model(config_chk)
     model1.load_state_dict({k.replace('module.', ''): v for k,
                             v in model_checkpoint['state_dict1'].items()})
     model2.load_state_dict({k.replace('module.', ''): v for k,
@@ -151,6 +163,7 @@ def main(config):
                     test_loader=test_loader,
                     model1=model1.eval().cuda(),
                     model2=model2.eval().cuda(),
+                    is_2d= is_2d,
                     save_dir=save_dir,
                     model_name=model_name)
     tester.test()

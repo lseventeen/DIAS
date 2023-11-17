@@ -15,3 +15,7 @@ from .d3.res_unet_3d import Res_UNet_3D
 from .d3.unet_nested_3d import UNet_Nested_3D
 from .d3tod2.ipn import IPN
 from .d3tod2.psc import PSC
+from .d3tod2.svs_net import SVS_Net
+from .d3tod2.qs_unet import QS_UNet
+from .d3tod2.vss_net import VSS_Net
+from .d3tod2.st_unet import ST_UNet

@@ -1,4 +1,4 @@
-from data.data_augmentation import Compose, ToTensor, CropToFixed, HorizontalFlip, BlobsToMask, VerticalFlip, RandomRotate90, GaussianBlur3D, RandomContrast, AdditiveGaussianNoise, ElasticDeformation, Cutout
+from utils.data_augmentation import Compose, ToTensor, CropToFixed, HorizontalFlip, BlobsToMask, VerticalFlip, RandomRotate90, GaussianBlur3D, RandomContrast, AdditiveGaussianNoise, ElasticDeformation, Cutout
 from skimage.transform import resize
 import torch.nn.functional as F
 import cv2
@@ -69,19 +69,20 @@ class label_dataset(Dataset):
 
         img = self.seq_DA(img)
         gt = self.gt_DA(gt)
-        return img, gt[0].long()
+        return img, gt.long()
 
     def __len__(self):
         return self.num_each_epoch
 
 
 class train_all_dataset(label_dataset):
-    def __init__(self, config, images_path, labels_path, unlabel_images_path, pseudo_images_path):
+    def __init__(self, config, images_path, labels_path, num_unlabel_images, unlabel_images_path, pseudo_images_path):
 
         self.images_path = images_path
         self.labels_path = labels_path
         self.unlabel_images_path = unlabel_images_path
         self.pseudo_images_path = pseudo_images_path
+        self.num_unlabel_images = num_unlabel_images
         self.size = config.DATASET.PATCH_SIZE
         self.num_each_epoch = config.DATASET.NUM_EACH_EPOCH
         self.epoch = config.TRAIN.EPOCHS
@@ -91,6 +92,7 @@ class train_all_dataset(label_dataset):
         self.gts = self.gts[0:int(config.DATASET.NUM_LABEL)]
         self.pl_images, self.pl_gts = self.read_image(
             self.unlabel_images_path, self.pseudo_images_path)
+        assert self.num_unlabel_images <= len(self.pl_images)
         # self.gts = self.read_label(self.labels_path)
         self.count = 0
         seed = np.random.randint(123)
@@ -145,14 +147,16 @@ class train_all_dataset(label_dataset):
             gt = self.gt_DA(gt)
 
         else:
-            id = np.random.randint(len(self.pl_images)//2)
+            id = np.random.randint(self.num_unlabel_images)
             img = self.pl_images[id]
             gt = self.pl_gts[id]
 
+            # img = self.seq_DA(img)
+            # gt = self.gt_DA(gt)
             img = self.strong_seq_DA(img)
             gt = self.strong_gt_DA(gt)
 
-        return img, gt[0].long()
+        return img, gt.long()
 
     def __len__(self):
         return self.num_each_epoch
@@ -192,7 +196,7 @@ class test_dataset(label_dataset):
 
         img = self.img_patch[idx]
         gt = self.gt_patch[idx]
-        return img, gt[0].long()
+        return img, gt.long()
 
     def __len__(self):
         return len(self.img_patch)
