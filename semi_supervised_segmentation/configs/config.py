@@ -5,7 +5,7 @@ from yacs.config import CfgNode as CN
 _C = CN()
 # Base config files
 _C.BASE = ['']
-_C.ITE = 3
+_C.ITE = 1
 _C.DIS = False
 _C.WORLD_SIZE = 1
 _C.SEED = 1234

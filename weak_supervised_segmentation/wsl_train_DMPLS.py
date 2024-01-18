@@ -1,44 +1,65 @@
+import sys
 import os
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(parent_dir)
 import time
 import math
 import torch
 from loguru import logger
 from tqdm import tqdm
 from utils.helpers import to_cuda
-from utils.metrics import AverageMeter, get_metrics, get_metrics
+from utils.metrics import AverageMeter, get_metrics
 import wandb
 import torch.distributed as dist
-gl_epoch = 0
-
+import argparse
+from loguru import logger
+from data import build_train_loader
+from utils.helpers import seed_torch
+from losses.losses import *
+from datetime import datetime
+import wandb
+from configs.config import get_config
+from models.build import build_wsl_model
+from lr_scheduler import build_scheduler
+from optimizer import build_optimizer
+import torch.backends.cudnn as cudnn
+import numpy as np
+import torch
+import torch.multiprocessing as mp
+import torch.distributed as dist
+from torch.nn.modules.loss import CrossEntropyLoss
+import random
 
 class Trainer:
-    def __init__(self, config, train_loader, val_loader, model,is_2d, loss, optimizer, lr_scheduler, tag):
+    def __init__(self, config, train_loader, val_loader, model, is_2d,optimizer, lr_scheduler):
         self.config = config
+
         self.scaler = torch.cuda.amp.GradScaler(enabled=True)
-        self.loss = loss
         self.model = model
-        self.is_2d = is_2d
+        self.is_2d =is_2d
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.optimizer = optimizer
         self.lr_scheduler = lr_scheduler
         self.num_steps = len(self.train_loader)
-        self.tag = tag
         if self._get_rank() == 0:
             self.checkpoint_dir = os.path.join(
-                config.SAVE_DIR, config.EXPERIMENT_ID, tag)
+                config.SAVE_DIR, config.EXPERIMENT_ID)
 
             os.makedirs(self.checkpoint_dir)
           # MONITORING
         self.improved = True
         self.not_improved_count = 0
         self.mnt_best = -math.inf if self.config.TRAIN.MNT_MODE == 'max' else math.inf
+        
+        self.ce_loss = CrossEntropyLoss(ignore_index=255)
+        self.dice_loss = pDLoss(2, ignore_index=255)
 
     def train(self):
 
         for epoch in range(1, self.config.TRAIN.EPOCHS+1):
-            global gl_epoch
-            gl_epoch = epoch
 
             if self.config.DIS:
                 self.train_loader.sampler.set_epoch(epoch)
@@ -77,10 +98,9 @@ class Trainer:
             # SAVE CHECKPOINT
             if self._get_rank() == 0:
                 self._save_checkpoint(epoch, save_best=self.improved)
-        return self.checkpoint_dir
 
     def _train_epoch(self, epoch):
-        wrt_mode = self.tag+"_train"
+        wrt_mode = "train"
         self.model.train()
 
         self._reset_metrics()
@@ -96,7 +116,27 @@ class Trainer:
             self.optimizer.zero_grad()
             with torch.cuda.amp.autocast(enabled=self.config.AMP):
                 pre = self.model(img)
-                loss = self.loss(pre, gt)
+
+
+                outputs, outputs_aux1 = self.model(img)
+                outputs_soft1 = torch.softmax(outputs, dim=1)
+                outputs_soft2 = torch.softmax(outputs_aux1, dim=1)
+
+                loss_ce1 = self.ce_loss(outputs, gt[:,0,...])
+                loss_ce2 = self.ce_loss(outputs_aux1, gt[:,0,...])
+                loss_ce = 0.5 * (loss_ce1 + loss_ce2)
+
+                beta = random.random() + 1e-10
+
+                pseudo_supervision = torch.argmax(
+                    (beta * outputs_soft1.detach() + (1.0-beta) * outputs_soft2.detach()), dim=1, keepdim=False)
+
+                loss_pse_sup = 0.5 * (self.dice_loss(outputs_soft1, pseudo_supervision.unsqueeze(
+                    1)) + self.dice_loss(outputs_soft2, pseudo_supervision.unsqueeze(1)))
+
+                loss = loss_ce + 0.5 * loss_pse_sup
+
+
             if self.config.AMP:
                 self.scaler.scale(loss).backward()
                 if self.config.TRAIN.DO_BACKPROP:
@@ -113,48 +153,66 @@ class Trainer:
             self.batch_time.update(time.time() - tic)
 
             self._metrics_update(
-                *get_metrics(torch.softmax(pre, dim=1).cpu().detach().numpy()[:, 1, :, :], gt.cpu().detach().numpy()).values())
+                *get_metrics(torch.softmax(pre[0][:, :self.config.DATASET.NUM_CLASSES], dim=1).cpu().detach().numpy()[:, 1, :, :], gt.cpu().detach().numpy()).values())
             tbar.set_description(
-                '{} ({}) | Loss: {:.4f} | AUC {:.4f} F1 {:.4f} Acc {:.4f}  Sen {:.4f} Spe {:.4f} Pre {:.4f} IOU {:.4f} |B {:.2f} D {:.2f} |'.format(
-                    self.tag, epoch, self.total_loss.average, *self._metrics_ave().values(), self.batch_time.average, self.data_time.average))
+                'TRAIN ({}) | Loss: {:.4f} | AUC {:.4f} F1 {:.4f} Acc {:.4f}  Sen {:.4f} Spe {:.4f} Pre {:.4f} IOU {:.4f} |B {:.2f} D {:.2f} |'.format(
+                    epoch, self.total_loss.average, *self._metrics_ave().values(), self.batch_time.average, self.data_time.average))
             tic = time.time()
             self.lr_scheduler.step_update(epoch * self.num_steps + idx)
         if self._get_rank() == 0:
-            wandb.log({f'{wrt_mode}/loss': self.total_loss.average})
+            wandb.log({f'{wrt_mode}/loss': self.total_loss.average}, step=epoch)
             for k, v in list(self._metrics_ave().items())[:-1]:
-                wandb.log({f'{wrt_mode}/{k}': v})
+                wandb.log({f'{wrt_mode}/{k}': v}, step=epoch)
             for i, opt_group in enumerate(self.optimizer.param_groups):
-                wandb.log({f'{wrt_mode}/Learning_rate_{i}': opt_group['lr']})
+                wandb.log(
+                    {f'{wrt_mode}/Learning_rate_{i}': opt_group['lr']}, step=epoch)
 
     def _valid_epoch(self, epoch):
-        logger.info(f'\n###### {self.tag} EVALUATION ######')
+        logger.info('\n###### EVALUATION ######')
         self.model.eval()
-        wrt_mode = self.tag+"_val"
+        wrt_mode = 'val'
         self._reset_metrics()
         tbar = tqdm(self.val_loader, ncols=160)
         with torch.no_grad():
             for idx, (img, gt) in enumerate(tbar):
                 img = to_cuda(img)
                 gt = to_cuda(gt)
-                if not self.is_2d:
-                    img = img.unsqueeze(1)
+
                 with torch.cuda.amp.autocast(enabled=self.config.AMP):
 
                     predict = self.model(img)
-                    loss = self.loss(predict, gt)
+
+
+                    outputs, outputs_aux1 = self.model(img)
+                    outputs_soft1 = torch.softmax(outputs, dim=1)
+                    outputs_soft2 = torch.softmax(outputs_aux1, dim=1)
+
+                    loss_ce1 = self.ce_loss(outputs, gt[:,0,...])
+                    loss_ce2 = self.ce_loss(outputs_aux1, gt[:,0,...])
+                    loss_ce = 0.5 * (loss_ce1 + loss_ce2)
+
+                    beta = random.random() + 1e-10
+
+                    pseudo_supervision = torch.argmax(
+                        (beta * outputs_soft1.detach() + (1.0-beta) * outputs_soft2.detach()), dim=1, keepdim=False)
+
+                    loss_pse_sup = 0.5 * (self.dice_loss(outputs_soft1, pseudo_supervision.unsqueeze(
+                        1)) + self.dice_loss(outputs_soft2, pseudo_supervision.unsqueeze(1)))
+
+                    loss = loss_ce + 0.5 * loss_pse_sup
 
                 self.total_loss.update(loss.item())
                 self._metrics_update(
-                    *get_metrics(torch.softmax(predict, dim=1).cpu().detach().numpy()[:, 1, :, :], gt.cpu().detach().numpy()).values())
+                    *get_metrics(torch.softmax(predict[0][:, :self.config.DATASET.NUM_CLASSES], dim=1).cpu().detach().numpy()[:, 1, :, :], gt.cpu().detach().numpy()).values())
                 tbar.set_description(
-                    '{} ({})  | Loss: {:.4f} | AUC {:.4f} F1 {:.4f} Acc {:.4f} Sen {:.4f} Spe {:.4f} Pre {:.4f} IOU {:.4f} |'.format(
-                        self.tag, epoch, self.total_loss.average, *self._metrics_ave().values()))
+                    'EVAL ({})  | Loss: {:.4f} | AUC {:.4f} F1 {:.4f} Acc {:.4f} Sen {:.4f} Spe {:.4f} Pre {:.4f} IOU {:.4f} |'.format(
+                        epoch, self.total_loss.average, *self._metrics_ave().values()))
 
         if self._get_rank() == 0:
 
-            wandb.log({f'{wrt_mode}/loss': self.total_loss.average})
+            wandb.log({f'{wrt_mode}/loss': self.total_loss.average}, step=epoch)
             for k, v in list(self._metrics_ave().items())[:-1]:
-                wandb.log({f'{wrt_mode}/{k}': v})
+                wandb.log({f'{wrt_mode}/{k}': v}, step=epoch)
 
         log = {
             'val_loss': self.total_loss.average,
@@ -223,3 +281,82 @@ class Trainer:
             "pre": self.pre.average,
             "IOU": self.iou.average
         }
+
+
+def parse_option():
+    parser = argparse.ArgumentParser("CVSS_training")
+    parser.add_argument('--cfg', type=str, metavar="FILE",
+                        help='path to config file')
+    parser.add_argument(
+        "--opts",
+        help="Modify config options by adding 'KEY VALUE' pairs. ",
+        default=None,
+        nargs='+',
+    )
+    parser.add_argument("--tag", help='tag of experiment')
+    parser.add_argument("-wm", "--wandb_mode", default="offline")
+    parser.add_argument("-mt", "--model_type", default="UNet_CCT")
+    parser.add_argument("-st", "--scribble_type", default="scribble")
+    parser.add_argument('-bs', '--batch-size', type=int, default=64,
+                        help="batch size for single GPU")
+    parser.add_argument('-ed', '--enable_distributed', help="training without DDP",
+                        required=False, action="store_true")
+    parser.add_argument('-ws', '--world_size', type=int,
+                        help="process number for DDP")
+    args = parser.parse_args()
+    config = get_config(args)
+
+    return args, config
+
+
+def main(config):
+    if config.DIS:
+        mp.spawn(main_worker,
+                 args=(config,),
+                 nprocs=config.WORLD_SIZE,)
+    else:
+        main_worker(0, config)
+
+
+def main_worker(local_rank, config):
+    if local_rank == 0:
+        config.defrost()
+        config.EXPERIMENT_ID = f"{config.WANDB.TAG}_{config.SCRIBBLE_TYPE}_{datetime.now().strftime('%y%m%d_%H%M%S')}"
+        config.freeze()
+        wandb.init(project=config.WANDB.PROJECT,
+                   name=config.EXPERIMENT_ID, config=config, mode=config.WANDB.MODE)
+    np.set_printoptions(formatter={'float': '{: 0.4f}'.format}, suppress=True)
+    torch.cuda.set_device(local_rank)
+    if config.DIS:
+        dist.init_process_group(
+            "nccl", init_method='env://', rank=local_rank, world_size=config.WORLD_SIZE)
+    seed = config.SEED + local_rank
+    seed_torch(seed)
+    cudnn.benchmark = True
+
+    train_loader, val_loader = build_train_loader(config)
+    model,is_2d = build_wsl_model(config)
+    # model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model).cuda()
+    if config.DIS:
+        model = torch.nn.parallel.DistributedDataParallel(
+            model, device_ids=[local_rank], find_unused_parameters=True)
+    logger.info(f'\n{model}\n')
+
+    optimizer = build_optimizer(config, model)
+    lr_scheduler = build_scheduler(config, optimizer, len(train_loader))
+    trainer = Trainer(config=config,
+                      train_loader=train_loader,
+                      val_loader=val_loader,
+                      model=model.cuda(),
+                      is_2d = is_2d,
+                      optimizer=optimizer,
+                      lr_scheduler=lr_scheduler)
+    trainer.train()
+
+
+if __name__ == '__main__':
+    os.environ["MASTER_ADDR"] = "localhost"
+    os.environ["MASTER_PORT"] = "10000"
+    _, config = parse_option()
+
+    main(config)

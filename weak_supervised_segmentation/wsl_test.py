@@ -1,3 +1,9 @@
+import sys
+import os
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(parent_dir)
 import argparse
 from loguru import logger
 from data import build_test_loader
@@ -5,7 +11,7 @@ from tester import Tester
 from utils.helpers import load_checkpoint
 from losses.losses import *
 from configs.config import get_val_config
-from models import build_model
+from models.build import build_wsl_model
 import numpy as np
 
 
@@ -36,9 +42,17 @@ def main(config):
     model_checkpoint = load_checkpoint(config.MODEL_PATH, False)
     config_chk = model_checkpoint["config"]
     model_name = config_chk.MODEL.TYPE
-    model,is_2d = build_model(config_chk)
+    model,is_2d = build_wsl_model(config_chk)
     model.load_state_dict({k.replace('module.', ''): v for k,
                           v in model_checkpoint['state_dict'].items()})
+    
+    # average_state_dict = {}
+    # model_state_dict1 = model_checkpoint['state_dict1']
+    # model_state_dict2 = model_checkpoint['state_dict2']
+    # for key in model_state_dict1:
+    #     if key in model_state_dict2:
+    #         average_state_dict[key] = (model_state_dict1[key] + model_state_dict2[key]) / 2
+    # model.load_state_dict(average_state_dict)
     logger.info(f'\n{model}\n')
     tester = Tester(config=config,
                     test_loader=test_loader,

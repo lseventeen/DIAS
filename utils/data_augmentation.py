@@ -730,3 +730,46 @@ def _recover_ignore_index(input, orig, ignore_index):
         input[mask] = ignore_index
 
     return input
+
+class Cutout(object):
+    """Randomly mask out one or more patches from an image.
+    Args:
+        n_holes (int): Number of patches to cut out of each image.
+        length (int): The length (in pixels) of each square patch.#固定长度的正方形边长
+    """
+
+    def __init__(self, random_state, prob=0.2, n_holes=1, length=16):
+        self.random_state = random_state
+        self.prob = prob
+        self.n_holes = n_holes
+        self.length = length
+
+    def __call__(self, img):
+        """
+        Args:
+            img (Tensor): Tensor image of size (C, H, W).
+        Returns:
+            Tensor: Image with n_holes of dimension length x length cut out of it.
+        """
+        if self.random_state.uniform() > self.prob:
+            _, h, w = img.shape
+
+            mask = np.ones((h, w), np.float32)
+
+            for n in range(self.n_holes):
+                # 正方形区域中心点随机出现
+                y = np.random.randint(h)
+                x = np.random.randint(w)
+                # 划出正方形区域，边界处截断
+                y1 = np.clip(y - self.length // 2, 0, h)
+                y2 = np.clip(y + self.length // 2, 0, h)
+                x1 = np.clip(x - self.length // 2, 0, w)
+                x2 = np.clip(x + self.length // 2, 0, w)
+                # 全0填充区域
+                mask[y1: y2, x1: x2] = 0.
+
+            # mask = torch.from_numpy(mask)
+            # mask = mask.expand_as(img)
+            img = img * mask
+
+        return img

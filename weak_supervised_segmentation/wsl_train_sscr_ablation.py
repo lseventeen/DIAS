@@ -21,7 +21,7 @@ from losses.losses import *
 from datetime import datetime
 import wandb
 from configs.config import get_config_PLC
-from models import build_model
+from models.build import build_wsl_model
 from lr_scheduler import build_scheduler
 from optimizer import build_optimizer
 import os
@@ -122,6 +122,7 @@ class Trainer:
             if not self.is_2d:
                 img1 = img1.unsqueeze(1)
                 img2 = img2.unsqueeze(1)
+                # 
             gt = to_cuda(gt.squeeze(1))
             self.optimizer1.zero_grad()
             self.optimizer2.zero_grad()
@@ -140,7 +141,8 @@ class Trainer:
                 pseudo_gt1[gt == 1] = 1
                 pseudo_gt2[gt == 0] = 0
                 pseudo_gt2[gt == 1] = 1
-
+                # ce_loss1 = self.ce_loss(pre1, pseudo_gt1)
+            
                 ce_loss1 = self.ce_loss(pre1, pseudo_gt2)
                 ce_loss2 = self.ce_loss(pre2, pseudo_gt1)
 
@@ -150,7 +152,9 @@ class Trainer:
                 loss = pce_loss1+pce_loss2+self.pseudo_weight * \
                     (ce_loss1+ce_loss2)+self.consistency_weight * \
                     (self.consistency_loss)
-                # loss = pce_loss1+pce_loss2
+                # loss = pce_loss1+self.pseudo_weight *ce_loss1
+                # loss = pce_loss1+pce_loss2+self.pseudo_weight * \
+                #     (ce_loss1+ce_loss2)
 
             if self.config.AMP:
                 self.scaler.scale(loss).backward()
@@ -172,7 +176,7 @@ class Trainer:
             self._metrics_update(
                 *get_metrics(torch.softmax(pre1[:, :self.config.DATASET.NUM_CLASSES], dim=1).cpu().detach().numpy()[:, 1, :, :], gt.cpu().detach().numpy()).values())
             tbar.set_description(
-                'TRAIN ({}) | Loss: {:.4f} | AUC {:.4f} F1 {:.4f} Acc {:.4f}  Sen {:.4f} Spe {:.4f} Pre {:.4f} IOU {:.4f} |B {:.2f} D {:.2f} |'.format(
+                'TRAIN ({}) | Loss: {:.4f} |DSC {:.4f}  Acc {:.4f}  Sen {:.4f} Spe {:.4f}  IOU {:.4f} AUC {:.4f} |B {:.2f} D {:.2f} |'.format(
                     epoch, self.total_loss.average, *self._metrics_ave().values(), self.batch_time.average, self.data_time.average))
             tic = time.time()
             self.lr_scheduler1.step_update(epoch * self.num_steps + idx)
@@ -208,8 +212,8 @@ class Trainer:
                 self._metrics_update(
                     *get_metrics(torch.softmax(predict[:, :self.config.DATASET.NUM_CLASSES], dim=1).cpu().detach().numpy()[:, 1, :, :], gt.cpu().detach().numpy()).values())
                 tbar.set_description(
-                    'EVAL ({})  | Loss: {:.4f} | AUC {:.4f} F1 {:.4f} Acc {:.4f} Sen {:.4f} Spe {:.4f} Pre {:.4f} IOU {:.4f} |'.format(
-                        epoch, self.total_loss.average, *self._metrics_ave().values()))
+                'EVAL ({})  | Loss: {:.4f} |DSC {:.4f}  Acc {:.4f}  Sen {:.4f} Spe {:.4f}  IOU {:.4f} AUC {:.4f} |'.format(
+                    epoch, self.total_loss.average, *self._metrics_ave().values()))
 
         if self._get_rank() == 0:
 
@@ -279,13 +283,13 @@ class Trainer:
     def _metrics_ave(self):
 
         return {
-            "AUC": self.auc.average,
+            
             "F1": self.f1.average,
             "Acc": self.acc.average,
             "Sen": self.sen.average,
             "Spe": self.spe.average,
-            "pre": self.pre.average,
-            "IOU": self.iou.average
+            "IOU": self.iou.average,
+            "AUC": self.auc.average,
         }
 
 
@@ -346,8 +350,8 @@ def main_worker(local_rank, config):
     cudnn.benchmark = True
 
     train_loader, val_loader = build_PLC_train_loader(config)
-    model1,is_2d = build_model(config)
-    model2,_ = build_model(config)
+    model1,is_2d = build_wsl_model(config)
+    model2,_ = build_wsl_model(config)
     # model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model).cuda()
     if config.DIS:
         model = torch.nn.parallel.DistributedDataParallel(

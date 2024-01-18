@@ -107,7 +107,7 @@ class PLC_Train_dataset(Dataset):
             GaussianBlur3D(execution_probability=0.5),
             AdditiveGaussianNoise(np.random.RandomState(
                 seed), scale=(0., 0.1), execution_probability=0.1),
-            ToTensor(False)
+            # ToTensor(False)
         ])
 
     def read_image(self, images_path, label_path):
@@ -140,11 +140,11 @@ class PLC_Train_dataset(Dataset):
 
         img = self.seq_DA(img)
         gt = self.gt_DA(gt)
-        # img = self.separate_DA(img)
+        # img1 = img
+        # img2 = img
         img1 = self.separate_DA(img)
         img2 = self.separate_DA(img)
-        
-        return img1, img2, gt.long()
+        return ToTensor(False)(img1), ToTensor(False)(img2), gt.long()
 
     def __len__(self):
         return self.num_each_epoch

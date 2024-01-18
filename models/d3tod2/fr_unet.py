@@ -15,7 +15,8 @@ class conv(nn.Module):
             nn.LeakyReLU(0.1, inplace=True),
             nn.Conv2d(out_c, out_c, kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(out_c),
-            nn.Dropout2d(dp))
+            nn.Dropout2d(dp),
+            nn.LeakyReLU(0.1, inplace=True))
         self.relu = nn.LeakyReLU(0.1, inplace=True)
 
     def forward(self, x):
@@ -110,15 +111,10 @@ class block(nn.Module):
 
 
 class FR_UNet(nn.Module):
-    def __init__(self, input_reduce="min", num_classes=3, num_channels=1, feature_scale=2,  dropout=0.1, fuse=True, out_ave=True):
+    def __init__(self, num_classes=3, num_channels=1, feature_scale=2,  dropout=0.1, fuse=True, out_ave=True):
         super(FR_UNet, self).__init__()
-        self.input_reduce = input_reduce
-        if input_reduce == "mean" or input_reduce == "min":
-            self.num_channels = 1
-        elif isinstance(input_reduce, list):
-            self.num_channels = len(input_reduce)
-        else:
-            self.num_channels = num_channels
+
+        self.num_channels = num_channels
 
         self.out_ave = out_ave
         filters = [64, 128, 256, 512, 1024]
@@ -170,18 +166,6 @@ class FR_UNet(nn.Module):
         self.apply(InitWeights)
 
     def forward(self, x):
-        if self.input_reduce == "mean":
-            x = torch.mean(x, dim=1, keepdim=True)
-            print(1)
-
-        elif self.input_reduce == "min":
-            x, _ = torch.min(x, dim=1, keepdim=True)
-        elif isinstance(self.input_reduce, list):
-            s = torch.split(x, 1, dim=1)
-            seq = []
-            for i in self.input_reduce:
-                seq.append(s[i])
-            x = torch.cat(seq, dim=1)
 
         x1_3, x_down1_3 = self.block1_3(x)
         x1_2, x_down1_2 = self.block1_2(x1_3)

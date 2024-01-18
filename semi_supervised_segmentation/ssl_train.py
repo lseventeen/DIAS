@@ -8,7 +8,7 @@ sys.path.append(parent_dir)
 import argparse
 from loguru import logger
 from data import build_train_single_loader, build_train_all_loader, build_val_loader, build_inference_loader
-from trainer import Trainer
+from ssl_trainer import SSL_Trainer
 from utils.helpers import seed_torch
 from losses.losses import DC_and_CE_loss
 from datetime import datetime
@@ -96,7 +96,7 @@ def main_worker(local_rank, config):
     tag = "ite_1_teacher"
     train_label_loader = build_train_single_loader(config)
     val_loader = build_val_loader(config)
-    trainer = Trainer(config=config,
+    trainer = SSL_Trainer(config=config,
                       train_loader=train_label_loader,
                       val_loader=val_loader,
                       model=model.cuda(),
@@ -126,7 +126,7 @@ def main_worker(local_rank, config):
         tag = f"ite_{i}_student"
         train_label_loader = build_train_all_loader(config, save_dir)
         val_loader = build_val_loader(config)
-        trainer = Trainer(config=config,
+        trainer = SSL_Trainer(config=config,
                           train_loader=train_label_loader,
                           val_loader=val_loader,
                           model=model.cuda(),

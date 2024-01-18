@@ -11,12 +11,6 @@ import os
 from batchgenerators.utilities.file_and_folder_operations import *
 
 
-def load_checkpoint(checkpoint_path, is_best=False):
-    checkpoint_file = "best_checkpoint.pth" if is_best else "final_checkpoint.pth"
-    checkpoint = torch.load(
-        join(checkpoint_path, checkpoint_file), map_location=torch.device('cpu'))
-    return checkpoint
-
 
 def seed_torch(seed=42):
     random.seed(seed)

@@ -10,7 +10,7 @@ from data import build_test_loader
 from utils.helpers import load_checkpoint
 from losses.losses import *
 from configs.config import get_val_config
-from models import build_model
+from models.build import build_wsl_model
 import numpy as np
 import time
 import cv2
@@ -19,7 +19,7 @@ import numpy as np
 import torch.backends.cudnn as cudnn
 from loguru import logger
 from tqdm import tqdm
-from wsl_train_PLC import Trainer
+from weak_supervised_segmentation.wsl_train_sscr import Trainer
 from utils.helpers import dir_exists, to_cuda, recompone_overlap
 from utils.metrics import get_metrics, get_metrics, count_connect_component, get_color
 from batchgenerators.utilities.file_and_folder_operations import *
@@ -69,8 +69,8 @@ class Tester(Trainer):
                     :, 1, :, :]
                 pre2 = torch.softmax(pre2[:, :self.config.DATASET.NUM_CLASSES], dim=1)[
                     :, 1, :, :]
-                pre = (pre1+pre2)/2
-                # pre = pre1
+                # pre = (pre1+pre2)/2
+                pre = pre1
                 pres.extend(pre)
                 tbar.set_description(
                     'TEST ({}) |  |B {:.2f} D {:.2f} |'.format(i, self.batch_time.average, self.data_time.average))
@@ -152,8 +152,8 @@ def main(config):
     model_checkpoint = load_checkpoint(config.MODEL_PATH, False)
     config_chk = model_checkpoint["config"]
     model_name = config_chk.MODEL.TYPE
-    model1,is_2d = build_model(config_chk)
-    model2,_ = build_model(config_chk)
+    model1,is_2d = build_wsl_model(config_chk)
+    model2,_ = build_wsl_model(config_chk)
     model1.load_state_dict({k.replace('module.', ''): v for k,
                             v in model_checkpoint['state_dict1'].items()})
     model2.load_state_dict({k.replace('module.', ''): v for k,

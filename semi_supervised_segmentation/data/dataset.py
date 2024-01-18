@@ -151,10 +151,10 @@ class train_all_dataset(label_dataset):
             img = self.pl_images[id]
             gt = self.pl_gts[id]
 
-            # img = self.seq_DA(img)
-            # gt = self.gt_DA(gt)
-            img = self.strong_seq_DA(img)
-            gt = self.strong_gt_DA(gt)
+            img = self.seq_DA(img)
+            gt = self.gt_DA(gt)
+            # img = self.strong_seq_DA(img)
+            # gt = self.strong_gt_DA(gt)
 
         return img, gt.long()
 

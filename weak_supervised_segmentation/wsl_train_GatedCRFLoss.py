@@ -21,7 +21,7 @@ from losses.losses import *
 from datetime import datetime
 import wandb
 from configs.config import get_config
-from models import build_model
+from models.build  import build_wsl_model
 from lr_scheduler import build_scheduler
 from optimizer import build_optimizer
 import torch.backends.cudnn as cudnn
@@ -294,7 +294,7 @@ def main(config):
 def main_worker(local_rank, config):
     if local_rank == 0:
         config.defrost()
-        config.EXPERIMENT_ID = f"{config.SCRIBBLE_TYPE}_{config.WANDB.TAG}_{datetime.now().strftime('%y%m%d_%H%M%S')}"
+        config.EXPERIMENT_ID = f"{config.WANDB.TAG}_{config.SCRIBBLE_TYPE}_{datetime.now().strftime('%y%m%d_%H%M%S')}"
         config.freeze()
         wandb.init(project=config.WANDB.PROJECT,
                    name=config.EXPERIMENT_ID, config=config, mode=config.WANDB.MODE)
@@ -308,7 +308,7 @@ def main_worker(local_rank, config):
     cudnn.benchmark = True
 
     train_loader, val_loader = build_train_loader(config)
-    model,is_2d = build_model(config)
+    model,is_2d = build_wsl_model(config)
     # model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model).cuda()
     if config.DIS:
         model = torch.nn.parallel.DistributedDataParallel(

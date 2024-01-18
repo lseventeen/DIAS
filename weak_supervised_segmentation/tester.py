@@ -5,7 +5,7 @@ import numpy as np
 import torch.backends.cudnn as cudnn
 from loguru import logger
 from tqdm import tqdm
-from wsl_train_PLC import Trainer
+from weak_supervised_segmentation.wsl_train_sscr import Trainer
 from utils.helpers import dir_exists, to_cuda,recompone_overlap
 from utils.metrics import get_metrics, get_metrics, count_connect_component,get_color
 from batchgenerators.utilities.file_and_folder_operations import *

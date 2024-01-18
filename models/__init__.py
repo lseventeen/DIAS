@@ -19,3 +19,6 @@ from .d3tod2.svs_net import SVS_Net
 from .d3tod2.qs_unet import QS_UNet
 from .d3tod2.vss_net import VSS_Net
 from .d3tod2.st_unet import ST_UNet
+
+from .d2.unet_cct import UNet_CCT
+from .d2.unet_dp import UNet_DP

@@ -156,7 +156,7 @@ class BiConvGRU(nn.Module):
         self.convgru_forward = BiConvGRUCell(output_channels, output_channels, 3)
         self.convgru_backward = BiConvGRUCell(output_channels, output_channels, 3)
         self.bidirection_conv = nn.Conv2d(2*output_channels, output_channels, 3, 1, 1)
-        self.fuse_conv = nn.Conv2d(2*output_channels, output_channels, 1)
+        # self.fuse_conv = nn.Conv2d(2*output_channels, output_channels, 1)
 
     def forward(self, x, s = None):
         if self.down is not None:
@@ -175,16 +175,19 @@ class BiConvGRU(nn.Module):
        
 
         # backward
-        # image = x[:,-1,:,:,:]   
+         
+        sequence_backward = []
+        image = x[:,-1,:,:,:]  
+        for i in range(x.shape[1]):
+            image = self.convgru_backward(x[:,x.shape[1]-1-i,:,:,:], image)
+            sequence_backward.append(image)
+
+        # image = sequence_forward[-1] 
+
         # sequence_backward = []
         # for i in range(x.shape[1]):
-        #     image = self.convgru_backward(x[:,x.shape[1]-1-i,:,:,:], image)
+        #     image = self.convgru_backward(sequence_forward[x.shape[1]-1-i], image)
         #     sequence_backward.append(image)
-        image = sequence_forward[-1]   
-        sequence_backward = []
-        for i in range(x.shape[1]):
-            image = self.convgru_backward(sequence_forward[x.shape[1]-1-i], image)
-            sequence_backward.append(image)
 
         #连接
         sequence_backward = sequence_backward[::-1]
@@ -286,9 +289,15 @@ class block(nn.Module):
 
 
 class VSS_Net(nn.Module):
-    def __init__(self, num_classes=3, num_channels=1, feature_scale=2,  dropout=0.2, fuse=True, out_ave=True):
+    def __init__(self, input_reduce=None, num_classes=2, num_channels=1, feature_scale=2,  dropout=0.2, fuse=True, out_ave=True):
         super(VSS_Net, self).__init__()
-        
+        self.input_reduce = input_reduce
+        # if input_reduce == "mean" or input_reduce == "min":
+        #     self.num_channels = 1
+        # elif isinstance(input_reduce, list):
+        #     self.num_channels = len(input_reduce)
+        # else:
+        #     self.num_channels = num_channels
         self.num_channels = num_channels
 
         self.out_ave = out_ave
@@ -351,6 +360,17 @@ class VSS_Net(nn.Module):
         self.apply(InitWeights)
 
     def forward(self, x):
+        if self.input_reduce == "mean":
+            x = torch.mean(x, dim=2, keepdim=True)
+        elif self.input_reduce == "min":
+            x, _ = torch.min(x, dim=2, keepdim=True)
+        elif isinstance(self.input_reduce, list):
+            s = torch.split(x, 1, dim=2)
+            seq = []
+            for i in self.input_reduce:
+                seq.append(s[i])
+            x = torch.cat(seq, dim=2)
+
         s = x.permute(0,2, 1, 3,4) 
         x = self.inc(x)
         x,sc1 = self.en1(x)

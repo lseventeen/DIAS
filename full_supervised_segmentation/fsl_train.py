@@ -6,7 +6,6 @@ import os
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
-print(parent_dir)
 import argparse
 from loguru import logger
 from data import build_train_loader

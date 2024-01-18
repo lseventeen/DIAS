@@ -1,3 +1,11 @@
+import sys
+import os
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(parent_dir)
+
+
 import argparse
 from loguru import logger
 from data import build_test_loader
@@ -10,7 +18,7 @@ import numpy as np
 
 
 def parse_option():
-    parser = argparse.ArgumentParser("CVSS_test")
+    parser = argparse.ArgumentParser("test")
     parser.add_argument('--cfg', type=str, metavar="FILE",
                         help='path to config file')
     parser.add_argument(
@@ -30,6 +38,8 @@ def parse_option():
 def main(config):
     save_dir = config.MODEL_PATH.split(
         '/')[-2]+"/"+config.MODEL_PATH.split('/')[-1]
+    # print(config.MODEL_PATH)
+    # print(save_dir)
     np.set_printoptions(formatter={'float': '{: 0.4f}'.format}, suppress=True)
     test_loader = build_test_loader(config)
 

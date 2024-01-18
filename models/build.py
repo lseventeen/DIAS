@@ -7,7 +7,9 @@ model_2d = {
     "CSNet",
     "UNet_Nested",
     "MAA_Net",
-    "Res_UNet"
+    "Res_UNet",
+    "UNet_DP"
+    
 }
 
 # model_3d = {
@@ -38,3 +40,26 @@ def build_model(config):
             num_classes=2,
             num_channels=1
         ), False
+    
+
+
+
+def build_wsl_model(config):
+    if config.MODEL.TYPE in model_2d:
+        return getattr(models, config.MODEL.TYPE)(
+            num_classes=3,
+            num_channels=8
+        ), True
+    elif config.MODEL.TYPE == "UNet_CCT":
+        return getattr(models, config.MODEL.TYPE)(
+                num_classes=2,
+                num_channels=8
+            ), True
+    else:
+        return getattr(models, config.MODEL.TYPE)(
+            num_classes=3,
+            num_channels=1
+        ), False
+
+
+
