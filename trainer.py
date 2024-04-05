@@ -108,16 +108,16 @@ class Trainer:
                 self.optimizer.step()
             self.total_loss.update(loss.item())
             self.batch_time.update(time.time() - tic)
-            self._metrics_update(
+            self._update_metrics(
                 *get_metrics(torch.softmax(pre, dim=1).cpu().detach().numpy()[:, 1, :, :], gt.cpu().detach().numpy()).values())
             tbar.set_description(
-                'TRAIN ({}) | Loss: {:.4f} |DSC {:.4f}  Acc {:.4f}  Sen {:.4f} Spe {:.4f}  IOU {:.4f} AUC {:.4f} |B {:.2f} D {:.2f} |'.format(
-                    epoch, self.total_loss.average, *self._metrics_ave().values(), self.batch_time.average, self.data_time.average))
+                'TRAIN ({}) | Loss: {:.4f} |DSC {:.4f}  Acc {:.4f}  Sen {:.4f} Spe {:.4f}  IOU {:.4f} AUC {:.4f} clDice {:.4f}|B {:.2f} D {:.2f} |'.format(
+                    epoch, self.total_loss.mean, *self._get_metrics_mean().values(), self.batch_time.mean, self.data_time.mean))
             tic = time.time()
             self.lr_scheduler.step_update(epoch * self.num_steps + idx)
         if self._get_rank() == 0:
-            wandb.log({f'{wrt_mode}/loss': self.total_loss.average}, step=epoch)
-            for k, v in list(self._metrics_ave().items())[:-1]:
+            wandb.log({f'{wrt_mode}/loss': self.total_loss.mean}, step=epoch)
+            for k, v in list(self._get_metrics_mean().items())[:-1]:
                 wandb.log({f'{wrt_mode}/{k}': v}, step=epoch)
             for i, opt_group in enumerate(self.optimizer.param_groups):
                 wandb.log(
@@ -141,21 +141,21 @@ class Trainer:
                     loss = self.loss(predict, gt)
 
                 self.total_loss.update(loss.item())
-                self._metrics_update(
+                self._update_metrics(
                     *get_metrics(torch.softmax(predict, dim=1).cpu().detach().numpy()[:, 1, :, :], gt.cpu().detach().numpy()).values())
                 tbar.set_description(
                 'EVAL ({})  | Loss: {:.4f} |DSC {:.4f}  Acc {:.4f}  Sen {:.4f} Spe {:.4f}  IOU {:.4f} AUC {:.4f} |'.format(
-                    epoch, self.total_loss.average, *self._metrics_ave().values()))
+                    epoch, self.total_loss.mean, *self._get_metrics_mean().values()))
 
         if self._get_rank() == 0:
 
-            wandb.log({f'{wrt_mode}/loss': self.total_loss.average}, step=epoch)
-            for k, v in list(self._metrics_ave().items())[:-1]:
+            wandb.log({f'{wrt_mode}/loss': self.total_loss.mean}, step=epoch)
+            for k, v in list(self._get_metrics_mean().items())[:-1]:
                 wandb.log({f'{wrt_mode}/{k}': v}, step=epoch)
 
         log = {
-            'val_loss': self.total_loss.average,
-            **self._metrics_ave()
+            'val_loss': self.total_loss.mean,
+            **self._get_metrics_mean()
         }
         return log
 
@@ -196,28 +196,42 @@ class Trainer:
         self.acc = AverageMeter()
         self.sen = AverageMeter()
         self.spe = AverageMeter()
-        self.pre = AverageMeter()
         self.iou = AverageMeter()
         self.VC = AverageMeter()
+        self.cldice = AverageMeter()
 
-    def _metrics_update(self, auc, DSC, acc, sen, spe, pre, iou):
-        self.auc.update(auc)
+    def _update_metrics(self, DSC, acc, sen, spe, iou,auc, cldice):
         self.DSC.update(DSC)
         self.acc.update(acc)
         self.sen.update(sen)
         self.spe.update(spe)
-        self.pre.update(pre)
         self.iou.update(iou)
+        self.auc.update(auc)
+        self.cldice.update(cldice)
 
-    def _metrics_ave(self):
+    def _get_metrics_mean(self):
 
         return {
             
-            "DSC": self.DSC.average,
-            "Acc": self.acc.average,
-            "Sen": self.sen.average,
-            "Spe": self.spe.average,
-            "IOU": self.iou.average,
-            "AUC": self.auc.average,
+            "DSC": self.DSC.mean,
+            "Acc": self.acc.mean,
+            "Sen": self.sen.mean,
+            "Spe": self.spe.mean,
+            "IOU": self.iou.mean,
+            "AUC": self.auc.mean,
+            "cldice": self.cldice.mean,
         }
+    def _get_metrics_std(self):
+
+        return {
+            
+            "DSC": self.DSC.std,
+            "Acc": self.acc.std,
+            "Sen": self.sen.std,
+            "Spe": self.spe.std,
+            "IOU": self.iou.std,
+            "AUC": self.auc.std,
+            "cldice": self.cldice.std,
+        }
+
 

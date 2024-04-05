@@ -7,7 +7,7 @@ from loguru import logger
 from tqdm import tqdm
 from trainer import Trainer
 from utils.helpers import dir_exists, remove_files,to_cuda,recompone_overlap
-from utils.metrics import get_metrics, get_metrics, count_connect_component,get_color
+from utils.metrics import get_metrics, get_metrics, count_connect_component,get_color,AverageMeter
 from batchgenerators.utilities.file_and_folder_operations import *
 import pandas as pd
 
@@ -29,29 +29,30 @@ class Tester(Trainer):
         cudnn.benchmark = True
 
     def test(self):
+        
         self.model.eval()
         self._reset_metrics()
+        self.VC=AverageMeter()
         gts = self.get_labels()
         tbar = tqdm(self.test_loader, ncols=150)
-        tic = time.time()
+
         pres = []
         with torch.no_grad():
             
-            for i, (img, gt) in enumerate(tbar):
-                self.data_time.update(time.time() - tic)
+            for img, _ in tbar:
+               
                 img = to_cuda(img)
-        
                 if not self.is_2d:
                     img = img.unsqueeze(1)
                 with torch.cuda.amp.autocast(enabled=self.config.AMP):
+                # with torch.cuda.amp.autocast(enabled=False):
                     pre = self.model(img)
             
-                self.batch_time.update(time.time() - tic)
+               
                 pre = torch.softmax(pre, dim=1)[:,1,:,:]
         
                 pres.extend(pre)
-                tbar.set_description(
-                    'TEST ({}) |  |B {:.2f} D {:.2f} |'.format(i, self.batch_time.average, self.data_time.average))
+        
 
         pres = torch.stack(pres, 0).cpu()
 
@@ -71,22 +72,48 @@ class Tester(Trainer):
             cv2.imwrite(self.save_path + f"/pre{j}.png", np.uint8(predict[j]*255))
             cv2.imwrite(self.save_path + f"/pre_b{j}.png", np.uint8(predict_b[j]*255))
             cv2.imwrite(self.save_path + f"/color_b{j}.png", get_color(predict_b[j],gts[j]))
-            self._metrics_update(*get_metrics(predict[j], gts[j]).values())
+            self._update_metrics(*get_metrics(predict[j], gts[j],run_clDice= True).values())
             self.VC.update(count_connect_component(predict_b[j], gts[j]))
-                
-            tic = time.time()    
 
-        data = list(self._metrics_ave().values())
-        data.append(self.VC.average)
-        columns = list(self._metrics_ave().keys())
+        
+                
+            # tic = time.time()    
+
+        mean_data = list(self._get_metrics_mean().values())
+        std_data = list(self._get_metrics_std().values())
+        mean_data.append(self.VC.mean)
+        std_data.append(self.VC.std)
+        columns = list(self._get_metrics_mean().keys())
         columns.append("VC")
-        df = pd.DataFrame(data=np.array(data).reshape(1, len(columns)), index=[self.model_name], columns = columns)
+
+
+        formatted_data = [f"{mean}$\pm${std}" for mean, std in zip(mean_data, std_data)]
+
+        # 创建一个字典，用于构造DataFrame
+        data_dict = {col: [val] for col, val in zip(columns, formatted_data)}
+
+        # 创建DataFrame
+        df = pd.DataFrame(data_dict)
+        # df = pd.DataFrame(data=np.array(data).reshape(1, len(columns)), index=[self.model_name], columns = columns)
+       
+        # logger.info(f"###### TEST EVALUATION ######")
+        # logger.info(f'test time:  {self.batch_time.average}')
+        # logger.info(f'     VC:  {self.VC.average}')
+  
+        
+
         df.to_csv(join(self.save_path, f"{self.model_name}_result.cvs"))
-        logger.info(f"###### TEST EVALUATION ######")
-        logger.info(f'test time:  {self.batch_time.average}')
-        logger.info(f'     VC:  {self.VC.average}')
-        for k, v in self._metrics_ave().items():
+        for k, v in self._get_metrics_mean().items():
             logger.info(f'{str(k):5s}: {v}')
+
+        for k, v in self._get_metrics_std().items():
+            logger.info(f'{str(k):5s}: {v}')
+        
+        logger.info(f'VC_mean: {self.VC.mean}')
+       
+        logger.info(f'VC_std: {self.VC.std}')
+     
+            
 
     def get_labels(self):
         labels = subfiles(self.labels_path, join=False, suffix='png')
@@ -96,6 +123,7 @@ class Tester(Trainer):
             gt = np.array(gt/255)
             label_list.append(gt)
         return label_list
+    
 
 
 

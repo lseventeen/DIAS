@@ -261,34 +261,49 @@ class Trainer:
         self.data_time = AverageMeter()
         self.total_loss = AverageMeter()
         self.auc = AverageMeter()
-        self.f1 = AverageMeter()
+        self.DSC = AverageMeter()
         self.acc = AverageMeter()
         self.sen = AverageMeter()
         self.spe = AverageMeter()
-        self.pre = AverageMeter()
         self.iou = AverageMeter()
         self.VC = AverageMeter()
+        self.cldice = AverageMeter()
 
-    def _metrics_update(self, auc, f1, acc, sen, spe, pre, iou):
-        self.auc.update(auc)
-        self.f1.update(f1)
+    def _update_metrics(self, DSC, acc, sen, spe, iou,auc, cldice):
+        self.DSC.update(DSC)
         self.acc.update(acc)
         self.sen.update(sen)
         self.spe.update(spe)
-        self.pre.update(pre)
         self.iou.update(iou)
+        self.auc.update(auc)
+        self.cldice.update(cldice)
 
-    def _metrics_ave(self):
+    def _get_metrics_mean(self):
 
         return {
             
-            "DSC": self.f1.average,
-            "Acc": self.acc.average,
-            "Sen": self.sen.average,
-            "Spe": self.spe.average,
-            "IOU": self.iou.average,
-            "AUC": self.auc.average,
+            "DSC": self.DSC.mean,
+            "Acc": self.acc.mean,
+            "Sen": self.sen.mean,
+            "Spe": self.spe.mean,
+            "IOU": self.iou.mean,
+            "AUC": self.auc.mean,
+            "cldice": self.cldice.mean,
         }
+    def _get_metrics_std(self):
+
+        return {
+            
+            "DSC": self.DSC.std,
+            "Acc": self.acc.std,
+            "Sen": self.sen.std,
+            "Spe": self.spe.std,
+            "IOU": self.iou.std,
+            "AUC": self.auc.std,
+            "cldice": self.cldice.std,
+        }
+
+
 
 
 def parse_option():

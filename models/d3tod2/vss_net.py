@@ -289,7 +289,7 @@ class block(nn.Module):
 
 
 class VSS_Net(nn.Module):
-    def __init__(self, input_reduce=None, num_classes=2, num_channels=1, feature_scale=2,  dropout=0.2, fuse=True, out_ave=True):
+    def __init__(self, input_reduce=[0,7], num_classes=2, num_channels=1, feature_scale=2,  dropout=0.2, fuse=True, out_ave=True):
         super(VSS_Net, self).__init__()
         self.input_reduce = input_reduce
         # if input_reduce == "mean" or input_reduce == "min":

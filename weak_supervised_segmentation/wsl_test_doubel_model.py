@@ -21,7 +21,7 @@ from loguru import logger
 from tqdm import tqdm
 from weak_supervised_segmentation.wsl_train_sscr import Trainer
 from utils.helpers import dir_exists, to_cuda, recompone_overlap
-from utils.metrics import get_metrics, get_metrics, count_connect_component, get_color
+from utils.metrics import AverageMeter, get_metrics, count_connect_component, get_color
 from batchgenerators.utilities.file_and_folder_operations import *
 import pandas as pd
 
@@ -47,15 +47,15 @@ class Tester(Trainer):
         self.model2.eval()
         
         self._reset_metrics()
+        self.VC=AverageMeter()
         gts = self.get_labels()
         
         tbar = tqdm(self.test_loader, ncols=150)
-        tic = time.time()
+        
         pres = []
         with torch.no_grad():
 
-            for i, (img, _) in enumerate(tbar):
-                self.data_time.update(time.time() - tic)
+            for img, _ in tbar:
                 img = to_cuda(img)
                 if not self.is_2d:
                     img = img.unsqueeze(1)
@@ -64,7 +64,6 @@ class Tester(Trainer):
                     pre1 = self.model1(img)
                     pre2 = self.model2(img)
 
-                self.batch_time.update(time.time() - tic)
                 pre1 = torch.softmax(pre1[:, :self.config.DATASET.NUM_CLASSES], dim=1)[
                     :, 1, :, :]
                 pre2 = torch.softmax(pre2[:, :self.config.DATASET.NUM_CLASSES], dim=1)[
@@ -72,8 +71,6 @@ class Tester(Trainer):
                 # pre = (pre1+pre2)/2
                 pre = pre1
                 pres.extend(pre)
-                tbar.set_description(
-                    'TEST ({}) |  |B {:.2f} D {:.2f} |'.format(i, self.batch_time.average, self.data_time.average))
 
         pres = torch.stack(pres, 0).cpu()
 
@@ -97,22 +94,38 @@ class Tester(Trainer):
                         f"/pre_b{j}.png", np.uint8(predict_b[j]*255))
             cv2.imwrite(self.save_path +
                         f"/color_b{j}.png", get_color(predict_b[j], gts[j]))
-            self._metrics_update(*get_metrics(predict[j], gts[j]).values())
+            self._update_metrics(*get_metrics(predict[j], gts[j],run_clDice= True).values())
             self.VC.update(count_connect_component(predict_b[j], gts[j]))
 
-            tic = time.time()
-        data = list(self._metrics_ave().values())
-        data.append(self.VC.average)
-        columns = list(self._metrics_ave().keys())
+        
+                
+            # tic = time.time()    
+
+        mean_data = list(self._get_metrics_mean().values())
+        std_data = list(self._get_metrics_std().values())
+        mean_data.append(self.VC.mean)
+        std_data.append(self.VC.std)
+        columns = list(self._get_metrics_mean().keys())
         columns.append("VC")
-        df = pd.DataFrame(data=np.array(data).reshape(1, len(columns)), index=[
-                          self.save_path.split("/")[-1]], columns=columns)
-        df.to_csv(join(self.save_path, "result.cvs"))
-        logger.info(f"###### TEST EVALUATION ######")
-        logger.info(f'test time:  {self.batch_time.average}')
-        logger.info(f'     VC:  {self.VC.average}')
-        for k, v in self._metrics_ave().items():
+
+
+        formatted_data = [f"{mean}$\pm${std}" for mean, std in zip(mean_data, std_data)]
+
+        # 创建一个字典，用于构造DataFrame
+        data_dict = {col: [val] for col, val in zip(columns, formatted_data)}
+
+        # 创建DataFrame
+        df = pd.DataFrame(data_dict)
+        df.to_csv(join(self.save_path, f"{self.model_name}_result.cvs"))
+        for k, v in self._get_metrics_mean().items():
             logger.info(f'{str(k):5s}: {v}')
+
+        for k, v in self._get_metrics_std().items():
+            logger.info(f'{str(k):5s}: {v}')
+        
+        logger.info(f'VC_mean: {self.VC.mean}')
+       
+        logger.info(f'VC_std: {self.VC.std}')
 
     def get_labels(self):
         labels = subfiles(self.labels_path, join=False, suffix='png')

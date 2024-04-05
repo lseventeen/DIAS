@@ -1,42 +1,23 @@
 import numpy as np
 import cv2
 from sklearn.metrics import roc_auc_score
-
+from utils.cldice import clDice
 
 class AverageMeter(object):
     def __init__(self):
-        self.initialized = False
-        self.val = None
-        self.avg = None
-        self.sum = None
-        self.count = None
+        self.val = []
 
-    def initialize(self, val, weight):
-        self.val = val
-        self.avg = val
-        self.sum = np.multiply(val, weight)
-        self.count = weight
-        self.initialized = True
+    def update(self, val):
+        self.val.append(val)
 
-    def update(self, val, weight=1):
-        if not self.initialized:
-            self.initialize(val, weight)
-        else:
-            self.add(val, weight)
-
-    def add(self, val, weight):
-        self.val = val
-        self.sum = np.add(self.sum, np.multiply(val, weight))
-        self.count = self.count + weight
-        self.avg = self.sum / self.count
 
     @property
-    def value(self):
-        return np.round(self.val, 4)
+    def mean(self):
+        return np.round(np.mean(self.val), 4)
 
     @property
-    def average(self):
-        return np.round(self.avg, 4)
+    def std(self):
+        return np.round(np.std(self.val), 4)
 
 
 def to_one_hot(seg, all_seg_labels=None):
@@ -48,10 +29,14 @@ def to_one_hot(seg, all_seg_labels=None):
     return result
 
 
-def get_metrics(predict, target, threshold=0.5):
+def get_metrics(predict, target,run_clDice = False, threshold=0.5):
 
-    predict = predict.flatten()
+    
     predict_b = np.where(predict >= threshold, 1, 0)
+    
+    cldice = clDice(predict_b,target) if run_clDice else 0
+    predict = predict.flatten()
+    predict_b = predict_b.flatten()
     target = target.flatten()
     if max(target) > 1:
         target = to_one_hot(target, all_seg_labels=[1]).flatten()
@@ -68,15 +53,15 @@ def get_metrics(predict, target, threshold=0.5):
     sen = tp / (tp + fn)
     spe = tn / (tn + fp)
     iou = tp / (tp + fp + fn)
-    f1 = 2 * pre * sen / (pre + sen)
+    DSC = 2 * pre * sen / (pre + sen)
     return {
-        "AUC": np.round(auc, 4),
-        "F1": np.round(f1, 4),
+        "DSC": np.round(DSC, 4),
         "Acc": np.round(acc, 4),
         "Sen": np.round(sen, 4),
         "Spe": np.round(spe, 4),
-        "pre": np.round(pre, 4),
         "IOU": np.round(iou, 4),
+        "AUC": np.round(auc, 4),
+        "cldice": np.round(cldice, 4)
     }
 
 
