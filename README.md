@@ -8,5 +8,4 @@ We will release the tutorial soon.
   <img src="doc/method.png" width="95%">
 </div>
 
-## To be continued
 
