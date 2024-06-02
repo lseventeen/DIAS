@@ -6,7 +6,7 @@ New! [DIAS](https://zenodo.org/records/11401368) is publicly available!
 We will release the tutorial soon.
 
 <div align="center">
-  <img src="method.png" width="95%">
+  <img src="method.png" width="85%">
 </div>
 
 
